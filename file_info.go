@@ -12,3 +12,23 @@ type FileInfo interface {
 	Owner() string
 	Group() string
 }
+
+type fileInfo struct {
+	os.FileInfo
+
+	mode  os.FileMode
+	owner string
+	group string
+}
+
+func (f *fileInfo) Mode() os.FileMode {
+	return f.mode
+}
+
+func (f *fileInfo) Owner() string {
+	return f.owner
+}
+
+func (f *fileInfo) Group() string {
+	return f.group
+}

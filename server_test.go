@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server_test
+package server
 
 import (
 	"io/ioutil"
@@ -12,34 +12,32 @@ import (
 	"testing"
 	"time"
 
-	filedriver "gitea.com/goftp/file-driver"
 	"github.com/jlaffaye/ftp"
 	"github.com/stretchr/testify/assert"
-	"goftp.io/server"
 )
 
 func runServer(t *testing.T, execute func()) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
-	var perm = server.NewSimplePerm("test", "test")
-	opt := &server.ServerOpts{
+	var perm = NewSimplePerm("test", "test")
+	opt := &ServerOpts{
 		Name: "test ftpd",
-		Factory: &filedriver.FileDriverFactory{
+		Factory: &FileDriverFactory{
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
 		Port: 2121,
-		Auth: &server.SimpleAuth{
+		Auth: &SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(server.DiscardLogger),
+		Logger: new(DiscardLogger),
 	}
 
-	s := server.NewServer(opt)
+	s := NewServer(opt)
 	go func() {
 		err := s.ListenAndServe()
-		assert.EqualError(t, err, server.ErrServerClosed.Error())
+		assert.EqualError(t, err, ErrServerClosed.Error())
 	}()
 
 	execute()
@@ -97,13 +95,13 @@ func TestConnect(t *testing.T) {
 			assert.EqualValues(t, 4, len(buf))
 			assert.EqualValues(t, content, string(buf))*/
 
-			err = f.Rename("/server_test.go", "/server.test.go")
+			err = f.Rename("/server_test.go", "/test.go")
 			assert.NoError(t, err)
 
 			err = f.MakeDir("/src")
 			assert.NoError(t, err)
 
-			err = f.Delete("/server.test.go")
+			err = f.Delete("/test.go")
 			assert.NoError(t, err)
 
 			err = f.RemoveDir("/src")
@@ -120,20 +118,20 @@ func TestConnect(t *testing.T) {
 func TestServe(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
-	var perm = server.NewSimplePerm("test", "test")
+	var perm = NewSimplePerm("test", "test")
 
 	// Server options without hostname or port
-	opt := &server.ServerOpts{
+	opt := &ServerOpts{
 		Name: "test ftpd",
-		Factory: &filedriver.FileDriverFactory{
+		Factory: &FileDriverFactory{
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
-		Auth: &server.SimpleAuth{
+		Auth: &SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(server.DiscardLogger),
+		Logger: new(DiscardLogger),
 	}
 
 	// Start the listener
@@ -141,10 +139,10 @@ func TestServe(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start the server using the listener
-	s := server.NewServer(opt)
+	s := NewServer(opt)
 	go func() {
 		err := s.Serve(l)
-		assert.EqualError(t, err, server.ErrServerClosed.Error())
+		assert.EqualError(t, err, ErrServerClosed.Error())
 	}()
 
 	// Give server 0.5 seconds to get to the listening state
