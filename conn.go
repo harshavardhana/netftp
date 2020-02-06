@@ -6,6 +6,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
@@ -16,6 +17,7 @@ import (
 	mrand "math/rand"
 	"net"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -158,6 +160,25 @@ func (conn *Conn) upgradeToTLS() error {
 // receiveLine accepts a single line FTP command and co-ordinates an
 // appropriate response.
 func (conn *Conn) receiveLine(line string) {
+	defer func() {
+		if e := recover(); e != nil {
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "Handler crashed with error: %v", e)
+
+			for i := 1; ; i++ {
+				_, file, line, ok := runtime.Caller(i)
+				if !ok {
+					break
+				} else {
+					fmt.Fprintf(&buf, "\n")
+				}
+				fmt.Fprintf(&buf, "%v:%v", file, line)
+			}
+
+			conn.logger.Print(conn.sessionID, buf.String())
+		}
+	}()
+
 	command, param := conn.parseLine(line)
 	conn.logger.PrintCommand(conn.sessionID, command, param)
 	cmdObj := commands[strings.ToUpper(command)]
