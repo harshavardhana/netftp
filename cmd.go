@@ -417,6 +417,7 @@ func (cmd commandList) Execute(conn *Conn, param string) {
 		conn.logger.Printf(conn.sessionID, "%s: no such file or directory.\n", path)
 		return
 	}
+
 	var files []FileInfo
 	if info.IsDir() {
 		err = conn.driver.ListDir(path, func(f FileInfo) error {

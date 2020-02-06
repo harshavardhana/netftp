@@ -16,7 +16,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func runServer(t *testing.T, execute func()) {
+func runServer(t *testing.T, opt *ServerOpts, execute func()) {
+	s := NewServer(opt)
+	go func() {
+		err := s.ListenAndServe()
+		assert.EqualError(t, err, ErrServerClosed.Error())
+	}()
+
+	execute()
+
+	assert.NoError(t, s.Shutdown())
+}
+
+func TestFileDriver(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
 	var perm = NewSimplePerm("test", "test")
@@ -34,21 +46,10 @@ func runServer(t *testing.T, execute func()) {
 		Logger: new(DiscardLogger),
 	}
 
-	s := NewServer(opt)
-	go func() {
-		err := s.ListenAndServe()
-		assert.EqualError(t, err, ErrServerClosed.Error())
-	}()
-
-	execute()
-
-	assert.NoError(t, s.Shutdown())
-}
-
-func TestConnect(t *testing.T) {
-	runServer(t, func() {
+	runServer(t, opt, func() {
 		// Give server 0.5 seconds to get to the listening state
 		timeout := time.NewTimer(time.Millisecond * 500)
+
 		for {
 			f, err := ftp.Connect("localhost:2121")
 			if err != nil && len(timeout.C) == 0 { // Retry errors
@@ -115,7 +116,7 @@ func TestConnect(t *testing.T) {
 	})
 }
 
-func TestServe(t *testing.T) {
+func TestLogin(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
 	var perm = NewSimplePerm("test", "test")
