@@ -37,7 +37,7 @@ type Conn struct {
 	server        *Server
 	tlsConfig     *tls.Config
 	sessionID     string
-	namePrefix    string
+	curDir        string
 	reqUser       string
 	user          string
 	renameFrom    string
@@ -242,9 +242,9 @@ func (conn *Conn) buildPath(filename string) (fullPath string) {
 	if len(filename) > 0 && filename[0:1] == "/" {
 		fullPath = filepath.Clean(filename)
 	} else if len(filename) > 0 && filename != "-a" {
-		fullPath = filepath.Clean(conn.namePrefix + "/" + filename)
+		fullPath = filepath.Clean(conn.curDir + "/" + filename)
 	} else {
-		fullPath = filepath.Clean(conn.namePrefix)
+		fullPath = filepath.Clean(conn.curDir)
 	}
 	fullPath = strings.Replace(fullPath, "//", "/", -1)
 	fullPath = strings.Replace(fullPath, string(filepath.Separator), "/", -1)
@@ -277,5 +277,10 @@ func (conn *Conn) sendOutofBandDataWriter(data io.ReadCloser) error {
 	conn.dataConn.Close()
 	conn.dataConn = nil
 
+	return nil
+}
+
+func (conn *Conn) changeCurDir(path string) error {
+	conn.curDir = path
 	return nil
 }

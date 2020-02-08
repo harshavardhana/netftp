@@ -23,22 +23,6 @@ func (driver *FileDriver) realPath(path string) string {
 	return filepath.Join(append([]string{driver.RootPath}, paths...)...)
 }
 
-func (driver *FileDriver) Init(conn *Conn) {
-	//driver.conn = conn
-}
-
-func (driver *FileDriver) ChangeDir(path string) error {
-	rPath := driver.realPath(path)
-	f, err := os.Lstat(rPath)
-	if err != nil {
-		return err
-	}
-	if f.IsDir() {
-		return nil
-	}
-	return errors.New("Not a directory")
-}
-
 func (driver *FileDriver) Stat(path string) (FileInfo, error) {
 	basepath := driver.realPath(path)
 	rPath, err := filepath.Abs(basepath)
@@ -149,9 +133,9 @@ func (driver *FileDriver) GetFile(path string, offset int64) (int64, io.ReadClos
 		return 0, nil, err
 	}
 
-	f.Seek(offset, os.SEEK_SET)
+	f.Seek(offset, io.SeekStart)
 
-	return info.Size(), f, nil
+	return info.Size() - offset, f, nil
 }
 
 func (driver *FileDriver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {

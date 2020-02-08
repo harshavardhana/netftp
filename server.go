@@ -163,7 +163,7 @@ func NewServer(opts *ServerOpts) *Server {
 // will handle all auth and persistence details.
 func (server *Server) newConn(tcpConn net.Conn, driver Driver) *Conn {
 	c := new(Conn)
-	c.namePrefix = "/"
+	c.curDir = "/"
 	c.conn = tcpConn
 	c.controlReader = bufio.NewReader(tcpConn)
 	c.controlWriter = bufio.NewWriter(tcpConn)
@@ -173,8 +173,6 @@ func (server *Server) newConn(tcpConn net.Conn, driver Driver) *Conn {
 	c.sessionID = newSessionID()
 	c.logger = server.logger
 	c.tlsConfig = server.tlsConfig
-
-	driver.Init(c)
 	return c
 }
 

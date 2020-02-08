@@ -7,6 +7,7 @@ package server
 import (
 	"errors"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -15,7 +16,7 @@ import (
 )
 
 var (
-	ErrNotImplemented = errors.New("not implemented")
+	_ Driver = &MinioDriver{}
 )
 
 type MinioDriver struct {
@@ -24,15 +25,16 @@ type MinioDriver struct {
 	bucket string
 }
 
-func (driver *MinioDriver) Init(conn *Conn) {
-}
-
-func (driver *MinioDriver) ChangeDir(path string) error {
-	return ErrNotImplemented
-}
-
 func buildMinioPath(p string) string {
 	return strings.TrimPrefix(p, "/")
+}
+
+func buildMinioDir(p string) string {
+	v := buildMinioPath(p)
+	if !strings.HasSuffix(v, "/") {
+		return v + "/"
+	}
+	return v
 }
 
 type minioFileInfo struct {
@@ -80,15 +82,16 @@ func (m *minioFileInfo) Group() string {
 func (driver *MinioDriver) isDir(path string) (bool, error) {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	p := buildMinioPath(path)
-	objectCh := driver.client.ListObjects(driver.bucket, p, false, doneCh)
-	for object := range objectCh {
-		if object.Err != nil {
-			return false, object.Err
-		}
-		return true, nil
+	p := buildMinioDir(path)
+	info, err := driver.client.StatObject(driver.bucket, p, minio.StatObjectOptions{})
+	if err != nil {
+		return false, err
 	}
-	return false, nil
+
+	if info.Err != nil {
+		return false, info.Err
+	}
+	return true, nil
 }
 
 func (driver *MinioDriver) Stat(path string) (FileInfo, error) {
@@ -103,7 +106,7 @@ func (driver *MinioDriver) Stat(path string) (FileInfo, error) {
 	p := buildMinioPath(path)
 	objInfo, err := driver.client.StatObject(driver.bucket, p, minio.StatObjectOptions{})
 	if err != nil {
-		if isDir, err := driver.isDir(path); err != nil {
+		if isDir, err := driver.isDir(p); err != nil {
 			return nil, err
 		} else if isDir {
 			return &minioFileInfo{
@@ -132,6 +135,11 @@ func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) e
 			return object.Err
 		}
 
+		// ignore itself
+		if object.Key == p {
+			continue
+		}
+
 		if err := callback(&minioFileInfo{
 			p:    object.Key,
 			info: object,
@@ -149,7 +157,7 @@ func (driver *MinioDriver) DeleteDir(path string) error {
 	defer close(doneCh)
 
 	p := buildMinioPath(path)
-	objectCh := driver.client.ListObjects(driver.bucket, p, false, doneCh)
+	objectCh := driver.client.ListObjects(driver.bucket, p, true, doneCh)
 	for object := range objectCh {
 		if object.Err != nil {
 			return object.Err
@@ -181,32 +189,59 @@ func (driver *MinioDriver) Rename(fromPath string, toPath string) error {
 }
 
 func (driver *MinioDriver) MakeDir(path string) error {
-	return nil
+	dirPath := buildMinioDir(path)
+	_, err := driver.client.PutObject(driver.bucket, dirPath, nil, 0, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	return err
 }
 
 func (driver *MinioDriver) GetFile(path string, offset int64) (int64, io.ReadCloser, error) {
-	if offset > 0 {
-		return 0, nil, ErrNotImplemented
-	}
-	object, err := driver.client.GetObject(driver.bucket, buildMinioPath(path), minio.GetObjectOptions{})
+	var opts = minio.GetObjectOptions{}
+	object, err := driver.client.GetObject(driver.bucket, buildMinioPath(path), opts)
 	if err != nil {
 		return 0, nil, err
 	}
+	object.Seek(offset, io.SeekStart)
 
 	info, err := object.Stat()
 	if err != nil {
 		return 0, nil, err
 	}
 
-	return info.Size, object, nil
+	return info.Size - offset, object, nil
 }
 
 func (driver *MinioDriver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {
+	p := buildMinioPath(destPath)
 	if !appendData {
-		return driver.client.PutObject(driver.bucket, buildMinioPath(destPath), data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+		return driver.client.PutObject(driver.bucket, p, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	}
 
-	return 0, ErrNotImplemented
+	tempFile := p + ".tmp"
+	//tempDstFile := p + ".dst"
+	defer func() {
+		if err := driver.DeleteFile(tempFile); err != nil {
+			log.Println(err)
+		}
+		/*if err := driver.DeleteFile(tempDstFile); err != nil {
+			log.Println(err)
+		}*/
+	}()
+
+	size, err := driver.client.PutObject(driver.bucket, tempFile, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	if err != nil {
+		return size, err
+	}
+
+	var srcs = []minio.SourceInfo{
+		minio.NewSourceInfo(driver.bucket, tempFile, nil),
+		minio.NewSourceInfo(driver.bucket, p, nil),
+	}
+	dst, err := minio.NewDestinationInfo(driver.bucket, p, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	return size, driver.client.ComposeObject(dst, srcs)
 }
 
 type MinioDriverFactory struct {

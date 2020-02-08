@@ -225,9 +225,18 @@ func (cmd commandCwd) RequireAuth() bool {
 
 func (cmd commandCwd) Execute(conn *Conn, param string) {
 	path := conn.buildPath(param)
-	err := conn.driver.ChangeDir(path)
+	info, err := conn.driver.Stat(path)
+	if err != nil {
+		conn.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed: ", err))
+		return
+	}
+	if !info.IsDir() {
+		conn.writeMessage(550, fmt.Sprint("Directory change to ", path, " is a file"))
+		return
+	}
+
+	err = conn.changeCurDir(path)
 	if err == nil {
-		conn.namePrefix = path
 		conn.writeMessage(250, "Directory changed to "+path)
 	} else {
 		conn.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed: ", err))
@@ -713,7 +722,7 @@ func (cmd commandPwd) RequireAuth() bool {
 }
 
 func (cmd commandPwd) Execute(conn *Conn, param string) {
-	conn.writeMessage(257, "\""+conn.namePrefix+"\" is the current directory")
+	conn.writeMessage(257, "\""+conn.curDir+"\" is the current directory")
 }
 
 // CommandQuit responds to the QUIT FTP command. The client has requested the

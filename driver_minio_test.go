@@ -54,6 +54,10 @@ func TestMinioDriver(t *testing.T) {
 			assert.NoError(t, f.Login("admin", "admin"))
 			assert.Error(t, f.Login("admin", ""))
 
+			curDir, err := f.CurrentDir()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "/", curDir)
+
 			err = f.RemoveDir("/")
 			assert.NoError(t, err)
 
@@ -73,8 +77,8 @@ func TestMinioDriver(t *testing.T) {
 			assert.NoError(t, err)
 			assert.EqualValues(t, 1, len(entries))
 			assert.EqualValues(t, "server_test.go", entries[0].Name)
-			assert.EqualValues(t, 4, entries[0].Size)
 			assert.EqualValues(t, ftp.EntryTypeFile, entries[0].Type)
+			assert.EqualValues(t, len(buf), entries[0].Size)
 
 			size, err := f.FileSize("/server_test.go")
 			assert.NoError(t, err)
@@ -107,6 +111,27 @@ func TestMinioDriver(t *testing.T) {
 			assert.EqualValues(t, 4, entries[0].Size)
 			assert.EqualValues(t, ftp.EntryTypeFile, entries[0].Type)
 
+			err = f.MakeDir("/src")
+			assert.NoError(t, err)
+
+			err = f.ChangeDir("/src")
+			assert.NoError(t, err)
+
+			curDir, err = f.CurrentDir()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "/src", curDir)
+
+			err = f.MakeDir("/new/1/2")
+			assert.NoError(t, err)
+
+			assert.NoError(t, f.Stor("/test/1/2/server_test3.go", strings.NewReader(content)))
+
+			r, err = f.RetrFrom("/test/1/2/server_test3.go", 2)
+			assert.NoError(t, err)
+
+			buf, err = ioutil.ReadAll(r)
+			assert.NoError(t, err)
+			assert.EqualValues(t, "st", string(buf))
 			break
 		}
 	})

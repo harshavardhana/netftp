@@ -12,7 +12,7 @@ import (
 
 func TestConnBuildPath(t *testing.T) {
 	c := &Conn{
-		namePrefix: "",
+		curDir: "",
 	}
 	var pathtests = []struct {
 		in  string

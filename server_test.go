@@ -87,14 +87,13 @@ func TestFileDriver(t *testing.T) {
 			assert.NoError(t, err)
 			assert.EqualValues(t, 4, size)
 
-			/*resp, err := f.RetrFrom("/server_test.go", 0)
+			r, err := f.RetrFrom("/server_test.go", 2)
 			assert.NoError(t, err)
-			var buf []byte
-			l, err := resp.Read(buf)
+
+			buf, err := ioutil.ReadAll(r)
+			r.Close()
 			assert.NoError(t, err)
-			assert.EqualValues(t, 4, l)
-			assert.EqualValues(t, 4, len(buf))
-			assert.EqualValues(t, content, string(buf))*/
+			assert.EqualValues(t, "st", string(buf))
 
 			err = f.Rename("/server_test.go", "/test.go")
 			assert.NoError(t, err)
@@ -104,6 +103,13 @@ func TestFileDriver(t *testing.T) {
 
 			err = f.Delete("/test.go")
 			assert.NoError(t, err)
+
+			err = f.ChangeDir("/src")
+			assert.NoError(t, err)
+
+			curDir, err = f.CurrentDir()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "/src", curDir)
 
 			err = f.RemoveDir("/src")
 			assert.NoError(t, err)

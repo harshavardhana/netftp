@@ -20,19 +20,11 @@ type DriverFactory interface {
 // chosen persistence layer. graval will create a new instance of your
 // driver for each client that connects and delegate to it as required.
 type Driver interface {
-	// Init init
-	Init(*Conn)
-
 	// params  - a file path
 	// returns - a time indicating when the requested path was last modified
 	//         - an error if the file doesn't exist or the user lacks
 	//           permissions
 	Stat(string) (FileInfo, error)
-
-	// params  - path
-	// returns - true if the current user is permitted to change to the
-	//           requested path
-	ChangeDir(string) error
 
 	// params  - path, function on file or subdir found
 	// returns - error
@@ -69,19 +61,6 @@ var _ Driver = &MultipleDriver{}
 // MultipleDriver represents a composite driver
 type MultipleDriver struct {
 	drivers map[string]Driver
-}
-
-// Init init
-func (driver *MultipleDriver) Init(conn *Conn) {
-}
-
-func (driver *MultipleDriver) ChangeDir(path string) error {
-	for prefix, driver := range driver.drivers {
-		if strings.HasPrefix(path, prefix) {
-			return driver.ChangeDir(strings.TrimPrefix(path, prefix))
-		}
-	}
-	return errors.New("Not a directory")
 }
 
 func (driver *MultipleDriver) Stat(path string) (FileInfo, error) {
