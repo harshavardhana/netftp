@@ -67,6 +67,10 @@ func (conn *Conn) passiveListenIP() string {
 		listenIP = conn.conn.LocalAddr().(*net.TCPAddr).IP.String()
 	}
 
+	if listenIP == "::1" {
+		return listenIP
+	}
+
 	lastIdx := strings.LastIndex(listenIP, ":")
 	if lastIdx <= 0 {
 		return listenIP

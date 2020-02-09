@@ -386,14 +386,13 @@ func (cmd commandEpsv) RequireAuth() bool {
 }
 
 func (cmd commandEpsv) Execute(conn *Conn, param string) {
-	addr := conn.passiveListenIP()
-	socket, err := newPassiveSocket(addr, conn.PassivePort, conn.logger, conn.sessionID, conn.tlsConfig)
+	socket, err := conn.newPassiveSocket()
 	if err != nil {
 		log.Println(err)
 		conn.writeMessage(425, "Data connection failed")
 		return
 	}
-	conn.dataConn = socket
+
 	msg := fmt.Sprintf("Entering Extended Passive Mode (|||%d|)", socket.Port())
 	conn.writeMessage(229, msg)
 }
@@ -657,14 +656,21 @@ func (cmd commandPasv) RequireAuth() bool {
 
 func (cmd commandPasv) Execute(conn *Conn, param string) {
 	listenIP := conn.passiveListenIP()
-	socket, err := newPassiveSocket(listenIP, conn.PassivePort, conn.logger, conn.sessionID, conn.tlsConfig)
+	// TODO: IPv6 for this command is not implemented
+	if strings.HasPrefix(listenIP, "::") {
+		conn.writeMessage(550, fmt.Sprint("Action not taken "))
+		return
+	}
+
+	socket, err := conn.newPassiveSocket()
 	if err != nil {
 		conn.writeMessage(425, "Data connection failed")
 		return
 	}
-	conn.dataConn = socket
+
 	p1 := socket.Port() / 256
 	p2 := socket.Port() - (p1 * 256)
+
 	quads := strings.Split(listenIP, ".")
 	target := fmt.Sprintf("(%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2)
 	msg := "Entering Passive Mode " + target

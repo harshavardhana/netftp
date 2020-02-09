@@ -93,7 +93,7 @@ func (driver *FileDriver) DeleteDir(path string) error {
 		return err
 	}
 	if f.IsDir() {
-		return os.Remove(rPath)
+		return os.RemoveAll(rPath)
 	}
 	return errors.New("Not a directory")
 }

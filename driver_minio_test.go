@@ -36,7 +36,7 @@ func TestMinioDriver(t *testing.T) {
 			Name:     "admin",
 			Password: "admin",
 		},
-		//Logger: new(DiscardLogger),
+		Logger: new(DiscardLogger),
 	}
 
 	runServer(t, opt, func() {
@@ -130,8 +130,24 @@ func TestMinioDriver(t *testing.T) {
 			assert.NoError(t, err)
 
 			buf, err = ioutil.ReadAll(r)
+			r.Close()
 			assert.NoError(t, err)
 			assert.EqualValues(t, "st", string(buf))
+
+			curDir, err = f.CurrentDir()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "/src", curDir)
+
+			assert.NoError(t, f.Stor("server_test.go", strings.NewReader(content)))
+
+			r, err = f.Retr("/src/server_test.go")
+			assert.NoError(t, err)
+
+			buf, err = ioutil.ReadAll(r)
+			r.Close()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "test", string(buf))
+
 			break
 		}
 	})
