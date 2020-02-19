@@ -39,7 +39,7 @@ func TestMinioDriver(t *testing.T) {
 		Logger: new(DiscardLogger),
 	}
 
-	runServer(t, opt, func() {
+	runServer(t, opt, nil, func() {
 		// Give server 0.5 seconds to get to the listening state
 		timeout := time.NewTimer(time.Millisecond * 500)
 		for {

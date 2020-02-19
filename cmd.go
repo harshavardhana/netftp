@@ -113,13 +113,16 @@ func (cmd commandAppe) Execute(conn *Conn, param string) {
 	targetPath := conn.buildPath(param)
 	conn.writeMessage(150, "Data transfer starting")
 
-	bytes, err := conn.driver.PutFile(targetPath, conn.dataConn, true)
+	conn.server.notifiers.BeforePutFile(conn, targetPath)
+	size, err := conn.driver.PutFile(targetPath, conn.dataConn, true)
+	conn.server.notifiers.AfterFilePut(conn, targetPath, size, err)
 	if err == nil {
-		msg := "OK, received " + strconv.Itoa(int(bytes)) + " bytes"
+		msg := fmt.Sprintf("OK, received %d bytes", size)
 		conn.writeMessage(226, msg)
 	} else {
 		conn.writeMessage(450, fmt.Sprint("error during transfer: ", err))
 	}
+
 }
 
 type commandOpts struct{}
@@ -235,7 +238,9 @@ func (cmd commandCwd) Execute(conn *Conn, param string) {
 		return
 	}
 
+	conn.server.notifiers.BeforeChangeCurDir(conn, conn.curDir, path)
 	err = conn.changeCurDir(path)
+	conn.server.notifiers.AfterCurDirChanged(conn, conn.curDir, path, err)
 	if err == nil {
 		conn.writeMessage(250, "Directory changed to "+path)
 	} else {
@@ -261,7 +266,9 @@ func (cmd commandDele) RequireAuth() bool {
 
 func (cmd commandDele) Execute(conn *Conn, param string) {
 	path := conn.buildPath(param)
+	conn.server.notifiers.BeforeDeleteFile(conn, path)
 	err := conn.driver.DeleteFile(path)
+	conn.server.notifiers.AfterFileDeleted(conn, path, err)
 	if err == nil {
 		conn.writeMessage(250, "File deleted")
 	} else {
@@ -546,7 +553,9 @@ func (cmd commandMkd) RequireAuth() bool {
 
 func (cmd commandMkd) Execute(conn *Conn, param string) {
 	path := conn.buildPath(param)
+	conn.server.notifiers.BeforeCreateDir(conn, path)
 	err := conn.driver.MakeDir(path)
+	conn.server.notifiers.AfterDirCreated(conn, path, err)
 	if err == nil {
 		conn.writeMessage(257, "Directory created")
 	} else {
@@ -622,6 +631,7 @@ func (cmd commandPass) RequireAuth() bool {
 
 func (cmd commandPass) Execute(conn *Conn, param string) {
 	ok, err := conn.server.Auth.CheckPasswd(conn.reqUser, param)
+	conn.server.notifiers.AfterUserLogin(conn, conn.reqUser, param, ok, err)
 	if err != nil {
 		conn.writeMessage(550, "Checking password error")
 		return
@@ -774,15 +784,18 @@ func (cmd commandRetr) Execute(conn *Conn, param string) {
 		conn.lastFilePos = 0
 		conn.appendData = false
 	}()
-	bytes, data, err := conn.driver.GetFile(path, conn.lastFilePos)
+	conn.server.notifiers.BeforeDownloadFile(conn, path)
+	size, data, err := conn.driver.GetFile(path, conn.lastFilePos)
 	if err == nil {
 		defer data.Close()
-		conn.writeMessage(150, fmt.Sprintf("Data transfer starting %v bytes", bytes))
+		conn.writeMessage(150, fmt.Sprintf("Data transfer starting %d bytes", size))
 		err = conn.sendOutofBandDataWriter(data)
+		conn.server.notifiers.AfterFileDownloaded(conn, path, size, err)
 		if err != nil {
 			conn.writeMessage(551, "Error reading file")
 		}
 	} else {
+		conn.server.notifiers.AfterFileDownloaded(conn, path, size, err)
 		conn.writeMessage(551, "File not available")
 	}
 }
@@ -883,7 +896,9 @@ func (cmd commandRmd) RequireAuth() bool {
 
 func (cmd commandRmd) Execute(conn *Conn, param string) {
 	path := conn.buildPath(param)
+	conn.server.notifiers.BeforeDeleteDir(conn, path)
 	err := conn.driver.DeleteDir(path)
+	conn.server.notifiers.AfterDirDeleted(conn, path, err)
 	if err == nil {
 		conn.writeMessage(250, "Directory deleted")
 	} else {
@@ -1104,9 +1119,11 @@ func (cmd commandStor) Execute(conn *Conn, param string) {
 		conn.appendData = false
 	}()
 
-	bytes, err := conn.driver.PutFile(targetPath, conn.dataConn, conn.appendData)
+	conn.server.notifiers.BeforePutFile(conn, targetPath)
+	size, err := conn.driver.PutFile(targetPath, conn.dataConn, conn.appendData)
+	conn.server.notifiers.AfterFilePut(conn, targetPath, size, err)
 	if err == nil {
-		msg := "OK, received " + strconv.Itoa(int(bytes)) + " bytes"
+		msg := fmt.Sprintf("OK, received %d bytes", size)
 		conn.writeMessage(226, msg)
 	} else {
 		conn.writeMessage(450, fmt.Sprint("error during transfer: ", err))
@@ -1214,6 +1231,7 @@ func (cmd commandUser) RequireAuth() bool {
 
 func (cmd commandUser) Execute(conn *Conn, param string) {
 	conn.reqUser = param
+	conn.server.notifiers.BeforeLoginUser(conn, conn.reqUser)
 	if conn.tls || conn.tlsConfig == nil {
 		conn.writeMessage(331, "User name ok, password required")
 	} else {

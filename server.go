@@ -75,6 +75,7 @@ type Server struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	feats     string
+	notifiers notifierList
 }
 
 // ErrServerClosed is returned by ListenAndServe() or Serve() when a shutdown
@@ -155,6 +156,11 @@ func NewServer(opts *ServerOpts) *Server {
 	s.listenTo = net.JoinHostPort(opts.Hostname, strconv.Itoa(opts.Port))
 	s.logger = opts.Logger
 	return s
+}
+
+// RegisterNotifer registers a notifier
+func (server *Server) RegisterNotifer(notifier Notifier) {
+	server.notifiers = append(server.notifiers, notifier)
 }
 
 // NewConn constructs a new object that will handle the FTP protocol over

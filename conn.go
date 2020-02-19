@@ -142,6 +142,8 @@ func (conn *Conn) Serve() {
 func (conn *Conn) Close() {
 	conn.conn.Close()
 	conn.closed = true
+	conn.reqUser = ""
+	conn.user = ""
 	if conn.dataConn != nil {
 		conn.dataConn.Close()
 		conn.dataConn = nil

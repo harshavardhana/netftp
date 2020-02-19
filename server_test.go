@@ -16,8 +16,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func runServer(t *testing.T, opt *ServerOpts, execute func()) {
+func runServer(t *testing.T, opt *ServerOpts, notifiers notifierList, execute func()) {
 	s := NewServer(opt)
+	for _, notifier := range notifiers {
+		s.RegisterNotifer(notifier)
+	}
 	go func() {
 		err := s.ListenAndServe()
 		assert.EqualError(t, err, ErrServerClosed.Error())
@@ -43,10 +46,10 @@ func TestFileDriver(t *testing.T) {
 			Name:     "admin",
 			Password: "admin",
 		},
-		//Logger: new(DiscardLogger),
+		Logger: new(DiscardLogger),
 	}
 
-	runServer(t, opt, func() {
+	runServer(t, opt, nil, func() {
 		// Give server 0.5 seconds to get to the listening state
 		timeout := time.NewTimer(time.Millisecond * 500)
 
