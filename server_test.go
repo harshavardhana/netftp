@@ -41,7 +41,7 @@ func TestFileDriver(t *testing.T) {
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
-		Port: 2121,
+		Port: 2122,
 		Auth: &SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
@@ -54,7 +54,7 @@ func TestFileDriver(t *testing.T) {
 		timeout := time.NewTimer(time.Millisecond * 500)
 
 		for {
-			f, err := ftp.Connect("localhost:2121")
+			f, err := ftp.Connect("localhost:2122")
 			if err != nil && len(timeout.C) == 0 { // Retry errors
 				continue
 			}
@@ -155,7 +155,7 @@ func TestLogin(t *testing.T) {
 	}
 
 	// Start the listener
-	l, err := net.Listen("tcp", ":2121")
+	l, err := net.Listen("tcp", ":2123")
 	assert.NoError(t, err)
 
 	// Start the server using the listener
@@ -168,7 +168,7 @@ func TestLogin(t *testing.T) {
 	// Give server 0.5 seconds to get to the listening state
 	timeout := time.NewTimer(time.Millisecond * 500)
 	for {
-		f, err := ftp.Connect("localhost:2121")
+		f, err := ftp.Connect("localhost:2123")
 		if err != nil && len(timeout.C) == 0 { // Retry errors
 			continue
 		}

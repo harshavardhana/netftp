@@ -31,7 +31,7 @@ func TestMinioDriver(t *testing.T) {
 	opt := &ServerOpts{
 		Name:    "test ftpd",
 		Factory: NewMinioDriverFactory(endpoint, accessKeyID, secretKey, location, bucket, useSSL, NewSimplePerm("root", "root")),
-		Port:    2121,
+		Port:    2120,
 		Auth: &SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
@@ -43,7 +43,7 @@ func TestMinioDriver(t *testing.T) {
 		// Give server 0.5 seconds to get to the listening state
 		timeout := time.NewTimer(time.Millisecond * 500)
 		for {
-			f, err := ftp.Connect("localhost:2121")
+			f, err := ftp.Connect("localhost:2120")
 			if err != nil && len(timeout.C) == 0 { // Retry errors
 				continue
 			}

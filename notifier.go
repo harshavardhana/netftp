@@ -111,3 +111,51 @@ func (notifiers notifierList) AfterDirDeleted(conn *Conn, dstPath string, err er
 		notifier.AfterDirDeleted(conn, dstPath, err)
 	}
 }
+
+type NullNotifier struct{}
+
+var (
+	_ Notifier = &NullNotifier{}
+)
+
+func (NullNotifier) BeforeLoginUser(conn *Conn, userName string) {
+}
+
+func (NullNotifier) BeforePutFile(conn *Conn, dstPath string) {
+}
+
+func (NullNotifier) BeforeDeleteFile(conn *Conn, dstPath string) {
+}
+
+func (NullNotifier) BeforeChangeCurDir(conn *Conn, oldCurDir, newCurDir string) {
+}
+
+func (NullNotifier) BeforeCreateDir(conn *Conn, dstPath string) {
+}
+
+func (NullNotifier) BeforeDeleteDir(conn *Conn, dstPath string) {
+}
+
+func (NullNotifier) BeforeDownloadFile(conn *Conn, dstPath string) {
+}
+
+func (NullNotifier) AfterUserLogin(conn *Conn, userName, password string, passMatched bool, err error) {
+}
+
+func (NullNotifier) AfterFilePut(conn *Conn, dstPath string, size int64, err error) {
+}
+
+func (NullNotifier) AfterFileDeleted(conn *Conn, dstPath string, err error) {
+}
+
+func (NullNotifier) AfterFileDownloaded(conn *Conn, dstPath string, size int64, err error) {
+}
+
+func (NullNotifier) AfterCurDirChanged(conn *Conn, oldCurDir, newCurDir string, err error) {
+}
+
+func (NullNotifier) AfterDirCreated(conn *Conn, dstPath string, err error) {
+}
+
+func (NullNotifier) AfterDirDeleted(conn *Conn, dstPath string, err error) {
+}
