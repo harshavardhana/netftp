@@ -71,7 +71,7 @@ func TestPassiveListenIP(t *testing.T) {
 	c := &Conn{
 		server: &Server{
 			ServerOpts: &ServerOpts{
-				PublicIp: "1.1.1.1",
+				PublicIP: "1.1.1.1",
 			},
 		},
 	}

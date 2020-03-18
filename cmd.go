@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// Command represents a Command interface to a ftp command
 type Command interface {
 	IsExtend() bool
 	RequireParam() bool

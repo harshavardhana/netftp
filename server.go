@@ -35,7 +35,7 @@ type ServerOpts struct {
 	Hostname string
 
 	// Public IP of the server
-	PublicIp string
+	PublicIP string
 
 	// Passive ports
 	PassivePorts string
@@ -116,9 +116,10 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 		newOpts.Auth = opts.Auth
 	}
 
-	newOpts.Logger = &StdLogger{}
 	if opts.Logger != nil {
 		newOpts.Logger = opts.Logger
+	} else {
+		newOpts.Logger = &StdLogger{}
 	}
 
 	newOpts.TLS = opts.TLS
@@ -126,7 +127,7 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 	newOpts.CertFile = opts.CertFile
 	newOpts.ExplicitFTPS = opts.ExplicitFTPS
 
-	newOpts.PublicIp = opts.PublicIp
+	newOpts.PublicIP = opts.PublicIP
 	newOpts.PassivePorts = opts.PassivePorts
 
 	return &newOpts
