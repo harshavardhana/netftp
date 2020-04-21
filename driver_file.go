@@ -214,5 +214,10 @@ type FileDriverFactory struct {
 
 // NewDriver implements DriverFactory
 func (factory *FileDriverFactory) NewDriver() (Driver, error) {
+	var err error
+	factory.RootPath, err = filepath.Abs(factory.RootPath)
+	if err != nil {
+		return nil, err
+	}
 	return &FileDriver{factory.RootPath, factory.Perm}, nil
 }
