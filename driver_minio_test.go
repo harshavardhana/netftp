@@ -124,6 +124,13 @@ func TestMinioDriver(t *testing.T) {
 			err = f.MakeDir("/new/1/2")
 			assert.NoError(t, err)
 
+			entries, err = f.List("/new/1")
+			assert.NoError(t, err)
+			assert.EqualValues(t, 1, len(entries))
+			assert.EqualValues(t, "2/", entries[0].Name)
+			assert.EqualValues(t, 0, entries[0].Size)
+			assert.EqualValues(t, ftp.EntryTypeFolder, entries[0].Type)
+
 			assert.NoError(t, f.Stor("/test/1/2/server_test3.go", strings.NewReader(content)))
 
 			r, err = f.RetrFrom("/test/1/2/server_test3.go", 2)
