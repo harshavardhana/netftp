@@ -68,6 +68,11 @@ func (conn *Conn) PublicIP() string {
 	return conn.server.PublicIP
 }
 
+// ServerOpts returns the server options
+func (conn *Conn) ServerOpts() *ServerOpts {
+	return conn.server.ServerOpts
+}
+
 func (conn *Conn) passiveListenIP() string {
 	var listenIP string
 	if len(conn.PublicIP()) > 0 {
