@@ -16,9 +16,13 @@ type DriverFactory interface {
 	NewDriver() (Driver, error)
 }
 
-// Driver is an interface that you will create an implementation that speaks to your
-// chosen persistence layer. graval will create a new instance of your
+// Driver is an interface that you will implement to create a driver for your
+// chosen persistence layer. The server will create a new instance of your
 // driver for each client that connects and delegate to it as required.
+//
+// Note that if the driver also implements the Auth interface then
+// this will be called instead of calling ServerOpts.Auth. This allows
+// the Auth mechanism to change the driver configuration.
 type Driver interface {
 	// params  - a file path
 	// returns - a time indicating when the requested path was last modified
