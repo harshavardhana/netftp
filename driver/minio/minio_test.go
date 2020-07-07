@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package minio
 
 import (
 	"io/ioutil"
@@ -14,9 +14,25 @@ import (
 
 	"github.com/jlaffaye/ftp"
 	"github.com/stretchr/testify/assert"
+	"goftp.io/server/core"
 )
 
-func TestMinioDriver(t *testing.T) {
+func runServer(t *testing.T, opt *core.ServerOpts, notifiers []core.Notifier, execute func()) {
+	s := core.NewServer(opt)
+	for _, notifier := range notifiers {
+		s.RegisterNotifer(notifier)
+	}
+	go func() {
+		err := s.ListenAndServe()
+		assert.EqualError(t, err, core.ErrServerClosed.Error())
+	}()
+
+	execute()
+
+	assert.NoError(t, s.Shutdown())
+}
+
+func TestDriver(t *testing.T) {
 	endpoint := os.Getenv("MINIO_SERVER_ENDPOINT")
 	if endpoint == "" {
 		t.Skip()
@@ -28,15 +44,15 @@ func TestMinioDriver(t *testing.T) {
 	bucket := os.Getenv("MINIO_SERVER_BUCKET")
 	useSSL, _ := strconv.ParseBool(os.Getenv("MINIO_SERVER_USE_SSL"))
 
-	opt := &ServerOpts{
+	opt := &core.ServerOpts{
 		Name:    "test ftpd",
-		Factory: NewMinioDriverFactory(endpoint, accessKeyID, secretKey, location, bucket, useSSL, NewSimplePerm("root", "root")),
+		Factory: NewDriverFactory(endpoint, accessKeyID, secretKey, location, bucket, useSSL, core.NewSimplePerm("root", "root")),
 		Port:    2120,
-		Auth: &SimpleAuth{
+		Auth: &core.SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(DiscardLogger),
+		Logger: new(core.DiscardLogger),
 	}
 
 	runServer(t, opt, nil, func() {

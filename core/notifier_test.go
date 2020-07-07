@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package core_test
 
 import (
 	"io/ioutil"
@@ -14,6 +14,8 @@ import (
 
 	"github.com/jlaffaye/ftp"
 	"github.com/stretchr/testify/assert"
+	"goftp.io/server/core"
+	"goftp.io/server/driver/file"
 )
 
 type mockNotifier struct {
@@ -21,72 +23,72 @@ type mockNotifier struct {
 	lock    sync.Mutex
 }
 
-func (m *mockNotifier) BeforeLoginUser(conn *Conn, userName string) {
+func (m *mockNotifier) BeforeLoginUser(conn *core.Conn, userName string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeLoginUser")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforePutFile(conn *Conn, dstPath string) {
+func (m *mockNotifier) BeforePutFile(conn *core.Conn, dstPath string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforePutFile")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforeDeleteFile(conn *Conn, dstPath string) {
+func (m *mockNotifier) BeforeDeleteFile(conn *core.Conn, dstPath string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeDeleteFile")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforeChangeCurDir(conn *Conn, oldCurDir, newCurDir string) {
+func (m *mockNotifier) BeforeChangeCurDir(conn *core.Conn, oldCurDir, newCurDir string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeChangeCurDir")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforeCreateDir(conn *Conn, dstPath string) {
+func (m *mockNotifier) BeforeCreateDir(conn *core.Conn, dstPath string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeCreateDir")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforeDeleteDir(conn *Conn, dstPath string) {
+func (m *mockNotifier) BeforeDeleteDir(conn *core.Conn, dstPath string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeDeleteDir")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) BeforeDownloadFile(conn *Conn, dstPath string) {
+func (m *mockNotifier) BeforeDownloadFile(conn *core.Conn, dstPath string) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "BeforeDownloadFile")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterUserLogin(conn *Conn, userName, password string, passMatched bool, err error) {
+func (m *mockNotifier) AfterUserLogin(conn *core.Conn, userName, password string, passMatched bool, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterUserLogin")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterFilePut(conn *Conn, dstPath string, size int64, err error) {
+func (m *mockNotifier) AfterFilePut(conn *core.Conn, dstPath string, size int64, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterFilePut")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterFileDeleted(conn *Conn, dstPath string, err error) {
+func (m *mockNotifier) AfterFileDeleted(conn *core.Conn, dstPath string, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterFileDeleted")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterCurDirChanged(conn *Conn, oldCurDir, newCurDir string, err error) {
+func (m *mockNotifier) AfterCurDirChanged(conn *core.Conn, oldCurDir, newCurDir string, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterCurDirChanged")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterDirCreated(conn *Conn, dstPath string, err error) {
+func (m *mockNotifier) AfterDirCreated(conn *core.Conn, dstPath string, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterDirCreated")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterDirDeleted(conn *Conn, dstPath string, err error) {
+func (m *mockNotifier) AfterDirDeleted(conn *core.Conn, dstPath string, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterDirDeleted")
 	m.lock.Unlock()
 }
-func (m *mockNotifier) AfterFileDownloaded(conn *Conn, dstPath string, size int64, err error) {
+func (m *mockNotifier) AfterFileDownloaded(conn *core.Conn, dstPath string, size int64, err error) {
 	m.lock.Lock()
 	m.actions = append(m.actions, "AfterFileDownloaded")
 	m.lock.Unlock()
@@ -104,24 +106,24 @@ func assetMockNotifier(t *testing.T, mock *mockNotifier, lastActions []string) {
 func TestNotification(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
-	var perm = NewSimplePerm("test", "test")
-	opt := &ServerOpts{
+	var perm = core.NewSimplePerm("test", "test")
+	opt := &core.ServerOpts{
 		Name: "test ftpd",
-		Factory: &FileDriverFactory{
+		Factory: &file.DriverFactory{
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
 		Port: 2121,
-		Auth: &SimpleAuth{
+		Auth: &core.SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(DiscardLogger),
+		Logger: new(core.DiscardLogger),
 	}
 
 	mock := &mockNotifier{}
 
-	runServer(t, opt, notifierList{mock}, func() {
+	runServer(t, opt, []core.Notifier{mock}, func() {
 		// Give server 0.5 seconds to get to the listening state
 		timeout := time.NewTimer(time.Millisecond * 500)
 

@@ -2,17 +2,9 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package file
 
 import "os"
-
-// FileInfo represents an file interface
-type FileInfo interface {
-	os.FileInfo
-
-	Owner() string
-	Group() string
-}
 
 type fileInfo struct {
 	os.FileInfo

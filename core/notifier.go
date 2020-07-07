@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package core
 
 // Notifier represents a notification operator interface
 type Notifier interface {

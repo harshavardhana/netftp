@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package core_test
 
 import (
 	"io/ioutil"
@@ -14,16 +14,18 @@ import (
 
 	"github.com/jlaffaye/ftp"
 	"github.com/stretchr/testify/assert"
+	"goftp.io/server/core"
+	"goftp.io/server/driver/file"
 )
 
-func runServer(t *testing.T, opt *ServerOpts, notifiers notifierList, execute func()) {
-	s := NewServer(opt)
+func runServer(t *testing.T, opt *core.ServerOpts, notifiers []core.Notifier, execute func()) {
+	s := core.NewServer(opt)
 	for _, notifier := range notifiers {
 		s.RegisterNotifer(notifier)
 	}
 	go func() {
 		err := s.ListenAndServe()
-		assert.EqualError(t, err, ErrServerClosed.Error())
+		assert.EqualError(t, err, core.ErrServerClosed.Error())
 	}()
 
 	execute()
@@ -34,19 +36,19 @@ func runServer(t *testing.T, opt *ServerOpts, notifiers notifierList, execute fu
 func TestFileDriver(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
-	var perm = NewSimplePerm("test", "test")
-	opt := &ServerOpts{
+	var perm = core.NewSimplePerm("test", "test")
+	opt := &core.ServerOpts{
 		Name: "test ftpd",
-		Factory: &FileDriverFactory{
+		Factory: &file.DriverFactory{
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
 		Port: 2122,
-		Auth: &SimpleAuth{
+		Auth: &core.SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(DiscardLogger),
+		Logger: new(core.DiscardLogger),
 	}
 
 	runServer(t, opt, nil, func() {
@@ -138,20 +140,20 @@ func TestFileDriver(t *testing.T) {
 func TestLogin(t *testing.T) {
 	os.MkdirAll("./testdata", os.ModePerm)
 
-	var perm = NewSimplePerm("test", "test")
+	var perm = core.NewSimplePerm("test", "test")
 
 	// Server options without hostname or port
-	opt := &ServerOpts{
+	opt := &core.ServerOpts{
 		Name: "test ftpd",
-		Factory: &FileDriverFactory{
+		Factory: &file.DriverFactory{
 			RootPath: "./testdata",
 			Perm:     perm,
 		},
-		Auth: &SimpleAuth{
+		Auth: &core.SimpleAuth{
 			Name:     "admin",
 			Password: "admin",
 		},
-		Logger: new(DiscardLogger),
+		Logger: new(core.DiscardLogger),
 	}
 
 	// Start the listener
@@ -159,10 +161,10 @@ func TestLogin(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start the server using the listener
-	s := NewServer(opt)
+	s := core.NewServer(opt)
 	go func() {
 		err := s.Serve(l)
-		assert.EqualError(t, err, ErrServerClosed.Error())
+		assert.EqualError(t, err, core.ErrServerClosed.Error())
 	}()
 
 	// Give server 0.5 seconds to get to the listening state

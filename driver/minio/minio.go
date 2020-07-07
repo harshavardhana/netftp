@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package server
+package minio
 
 import (
 	"errors"
@@ -13,16 +13,17 @@ import (
 	"time"
 
 	minio "github.com/minio/minio-go/v6"
+	"goftp.io/server/core"
 )
 
 var (
-	_ Driver = &MinioDriver{}
+	_ core.Driver = &Driver{}
 )
 
-// MinioDriver implements Driver to store files in minio
-type MinioDriver struct {
+// Driver implements Driver to store files in minio
+type Driver struct {
 	client *minio.Client
-	perm   Perm
+	perm   core.Perm
 	bucket string
 }
 
@@ -39,7 +40,7 @@ func buildMinioDir(p string) string {
 }
 
 type myPerm struct {
-	Perm
+	core.Perm
 	isDir bool
 }
 
@@ -57,7 +58,7 @@ func (m *myPerm) GetMode(user string) (os.FileMode, error) {
 type minioFileInfo struct {
 	p    string
 	info minio.ObjectInfo
-	perm Perm
+	perm core.Perm
 }
 
 func (m *minioFileInfo) Name() string {
@@ -95,7 +96,7 @@ func (m *minioFileInfo) Group() string {
 	return group
 }
 
-func (driver *MinioDriver) isDir(path string) (bool, error) {
+func (driver *Driver) isDir(path string) (bool, error) {
 	p := buildMinioDir(path)
 
 	info, err := driver.client.StatObject(driver.bucket, p, minio.StatObjectOptions{})
@@ -117,7 +118,7 @@ func (driver *MinioDriver) isDir(path string) (bool, error) {
 }
 
 // Stat implements Driver
-func (driver *MinioDriver) Stat(path string) (FileInfo, error) {
+func (driver *Driver) Stat(path string) (core.FileInfo, error) {
 	if path == "/" {
 		return &minioFileInfo{
 			p:    "/",
@@ -147,7 +148,7 @@ func (driver *MinioDriver) Stat(path string) (FileInfo, error) {
 }
 
 // ListDir implements Driver
-func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) error {
+func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -182,7 +183,7 @@ func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) e
 }
 
 // DeleteDir implements Driver
-func (driver *MinioDriver) DeleteDir(path string) error {
+func (driver *Driver) DeleteDir(path string) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -201,12 +202,12 @@ func (driver *MinioDriver) DeleteDir(path string) error {
 }
 
 // DeleteFile implements Driver
-func (driver *MinioDriver) DeleteFile(path string) error {
+func (driver *Driver) DeleteFile(path string) error {
 	return driver.client.RemoveObject(driver.bucket, buildMinioPath(path))
 }
 
 // Rename implements Driver
-func (driver *MinioDriver) Rename(fromPath string, toPath string) error {
+func (driver *Driver) Rename(fromPath string, toPath string) error {
 	src := minio.NewSourceInfo(driver.bucket, buildMinioPath(fromPath), nil)
 	dst, err := minio.NewDestinationInfo(driver.bucket, buildMinioPath(toPath), nil, nil)
 	if err != nil {
@@ -221,14 +222,14 @@ func (driver *MinioDriver) Rename(fromPath string, toPath string) error {
 }
 
 // MakeDir implements Driver
-func (driver *MinioDriver) MakeDir(path string) error {
+func (driver *Driver) MakeDir(path string) error {
 	dirPath := buildMinioDir(path)
 	_, err := driver.client.PutObject(driver.bucket, dirPath, nil, 0, minio.PutObjectOptions{})
 	return err
 }
 
 // GetFile implements Driver
-func (driver *MinioDriver) GetFile(path string, offset int64) (int64, io.ReadCloser, error) {
+func (driver *Driver) GetFile(path string, offset int64) (int64, io.ReadCloser, error) {
 	var opts = minio.GetObjectOptions{}
 	object, err := driver.client.GetObject(driver.bucket, buildMinioPath(path), opts)
 	if err != nil {
@@ -245,7 +246,7 @@ func (driver *MinioDriver) GetFile(path string, offset int64) (int64, io.ReadClo
 }
 
 // PutFile implements Driver
-func (driver *MinioDriver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *Driver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {
 	p := buildMinioPath(destPath)
 	if !appendData {
 		return driver.client.PutObject(driver.bucket, p, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
@@ -279,20 +280,20 @@ func (driver *MinioDriver) PutFile(destPath string, data io.Reader, appendData b
 	return size, driver.client.ComposeObject(dst, srcs)
 }
 
-// MinioDriverFactory implements DriverFactory
-type MinioDriverFactory struct {
+// DriverFactory implements DriverFactory
+type DriverFactory struct {
 	endpoint        string
 	accessKeyID     string
 	secretAccessKey string
 	useSSL          bool
 	location        string
 	bucket          string
-	perm            Perm
+	perm            core.Perm
 }
 
-// NewMinioDriverFactory creates a DriverFactory implementation
-func NewMinioDriverFactory(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool, perm Perm) *MinioDriverFactory {
-	return &MinioDriverFactory{
+// NewDriverFactory creates a DriverFactory implementation
+func NewDriverFactory(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool, perm core.Perm) *DriverFactory {
+	return &DriverFactory{
 		endpoint:        endpoint,
 		accessKeyID:     accessKeyID,
 		secretAccessKey: secretAccessKey,
@@ -304,7 +305,7 @@ func NewMinioDriverFactory(endpoint, accessKeyID, secretAccessKey, location, buc
 }
 
 // NewDriver implements DriverFactory
-func (factory *MinioDriverFactory) NewDriver() (Driver, error) {
+func (factory *DriverFactory) NewDriver() (core.Driver, error) {
 	// Initialize minio client object.
 	minioClient, err := minio.New(factory.endpoint, factory.accessKeyID, factory.secretAccessKey, factory.useSSL)
 	if err != nil {
@@ -319,7 +320,7 @@ func (factory *MinioDriverFactory) NewDriver() (Driver, error) {
 		}
 	}
 
-	return &MinioDriver{
+	return &Driver{
 		client: minioClient,
 		bucket: factory.bucket,
 		perm:   factory.perm,
