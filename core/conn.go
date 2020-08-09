@@ -209,6 +209,8 @@ func (conn *Conn) receiveLine(line string) {
 	}
 	if cmdObj.RequireParam() && param == "" {
 		conn.writeMessage(553, "action aborted, required param missing")
+	} else if conn.server.ServerOpts.ForceTLS && !conn.tls && !(cmdObj == commands["AUTH"] && param == "TLS") {
+		conn.writeMessage(534, "Request denied for policy reasons. AUTH TLS required.")
 	} else if cmdObj.RequireAuth() && conn.user == "" {
 		conn.writeMessage(530, "not logged in")
 	} else {

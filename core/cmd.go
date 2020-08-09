@@ -1238,9 +1238,5 @@ func (cmd commandUser) RequireAuth() bool {
 func (cmd commandUser) Execute(conn *Conn, param string) {
 	conn.reqUser = param
 	conn.server.notifiers.BeforeLoginUser(conn, conn.reqUser)
-	if conn.tls || conn.tlsConfig == nil {
-		conn.writeMessage(331, "User name ok, password required")
-	} else {
-		conn.writeMessage(534, "Unsecured login not allowed. AUTH TLS required")
-	}
+	conn.writeMessage(331, "User name ok, password required")
 }
