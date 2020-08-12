@@ -298,8 +298,16 @@ func (cmd commandEprt) Execute(conn *Conn, param string) {
 	delim := string(param[0:1])
 	parts := strings.Split(param, delim)
 	addressFamily, err := strconv.Atoi(parts[1])
+	if err != nil {
+		conn.writeMessage(522, "Network protocol not supported, use (1,2)")
+		return
+	}
 	host := parts[2]
 	port, err := strconv.Atoi(parts[3])
+	if err != nil {
+		conn.writeMessage(522, "Network protocol not supported, use (1,2)")
+		return
+	}
 	if addressFamily != 1 && addressFamily != 2 {
 		conn.writeMessage(522, "Network protocol not supported, use (1,2)")
 		return
@@ -336,12 +344,20 @@ func (cmd commandLprt) Execute(conn *Conn, param string) {
 	parts := strings.Split(param, ",")
 
 	addressFamily, err := strconv.Atoi(parts[0])
+	if err != nil {
+		conn.writeMessage(522, "Network protocol not supported, use 4")
+		return
+	}
 	if addressFamily != 4 {
 		conn.writeMessage(522, "Network protocol not supported, use 4")
 		return
 	}
 
 	addressLength, err := strconv.Atoi(parts[1])
+	if err != nil {
+		conn.writeMessage(522, "Network protocol not supported, use 4")
+		return
+	}
 	if addressLength != 4 {
 		conn.writeMessage(522, "Network IP length not supported, use 4")
 		return
@@ -350,6 +366,10 @@ func (cmd commandLprt) Execute(conn *Conn, param string) {
 	host := strings.Join(parts[2:2+addressLength], ".")
 
 	portLength, err := strconv.Atoi(parts[2+addressLength])
+	if err != nil {
+		conn.writeMessage(522, "Network protocol not supported, use 4")
+		return
+	}
 	portAddress := parts[3+addressLength : 3+addressLength+portLength]
 
 	// Convert string[] to byte[]
@@ -674,7 +694,7 @@ func (cmd commandPasv) Execute(conn *Conn, param string) {
 	listenIP := conn.passiveListenIP()
 	// TODO: IPv6 for this command is not implemented
 	if strings.HasPrefix(listenIP, "::") {
-		conn.writeMessage(550, fmt.Sprint("Action not taken "))
+		conn.writeMessage(550, "Action not taken")
 		return
 	}
 

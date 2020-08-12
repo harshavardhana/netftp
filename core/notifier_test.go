@@ -104,7 +104,8 @@ func assetMockNotifier(t *testing.T, mock *mockNotifier, lastActions []string) {
 }
 
 func TestNotification(t *testing.T) {
-	os.MkdirAll("./testdata", os.ModePerm)
+	err := os.MkdirAll("./testdata", os.ModePerm)
+	assert.NoError(t, err)
 
 	var perm = core.NewSimplePerm("test", "test")
 	opt := &core.ServerOpts{
@@ -157,15 +158,19 @@ func TestNotification(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = f.MakeDir("/src")
+			assert.NoError(t, err)
 			assetMockNotifier(t, mock, []string{"BeforeCreateDir", "AfterDirCreated"})
 
 			err = f.Delete("/test.go")
+			assert.NoError(t, err)
 			assetMockNotifier(t, mock, []string{"BeforeDeleteFile", "AfterFileDeleted"})
 
 			err = f.ChangeDir("/src")
+			assert.NoError(t, err)
 			assetMockNotifier(t, mock, []string{"BeforeChangeCurDir", "AfterCurDirChanged"})
 
 			err = f.RemoveDir("/src")
+			assert.NoError(t, err)
 			assetMockNotifier(t, mock, []string{"BeforeDeleteDir", "AfterDirDeleted"})
 
 			err = f.Quit()

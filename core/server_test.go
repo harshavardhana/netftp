@@ -34,7 +34,8 @@ func runServer(t *testing.T, opt *core.ServerOpts, notifiers []core.Notifier, ex
 }
 
 func TestFileDriver(t *testing.T) {
-	os.MkdirAll("./testdata", os.ModePerm)
+	err := os.MkdirAll("./testdata", os.ModePerm)
+	assert.NoError(t, err)
 
 	var perm = core.NewSimplePerm("test", "test")
 	opt := &core.ServerOpts{
@@ -138,7 +139,8 @@ func TestFileDriver(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	os.MkdirAll("./testdata", os.ModePerm)
+	err := os.MkdirAll("./testdata", os.ModePerm)
+	assert.NoError(t, err)
 
 	var perm = core.NewSimplePerm("test", "test")
 
