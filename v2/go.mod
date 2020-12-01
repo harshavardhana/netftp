@@ -1,4 +1,4 @@
-module goftp.io/server/v1
+module goftp.io/server/v2
 
 go 1.12
 

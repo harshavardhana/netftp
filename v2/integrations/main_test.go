@@ -7,7 +7,7 @@ package integrations
 import (
 	"testing"
 
-	"goftp.io/server/v1"
+	"goftp.io/server/v2"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	minio "github.com/minio/minio-go/v6"
-	"goftp.io/server/v1"
+	"goftp.io/server/v2"
 )
 
 var (
