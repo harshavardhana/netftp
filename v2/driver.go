@@ -31,12 +31,12 @@ type Driver interface {
 	// returns - a time indicating when the requested path was last modified
 	//         - an error if the file doesn't exist or the user lacks
 	//           permissions
-	Stat(*Context, string) (FileInfo, error)
+	Stat(*Context, string) (os.FileInfo, error)
 
 	// params  - path, function on file or subdir found
 	// returns - error
 	//           path
-	ListDir(*Context, string, func(FileInfo) error) error
+	ListDir(*Context, string, func(os.FileInfo) error) error
 
 	// params  - path
 	// returns - nil if the directory was deleted or any error encountered
@@ -78,7 +78,7 @@ func NewMultiDriver(drivers map[string]Driver) Driver {
 }
 
 // Stat implements Driver
-func (driver *MultiDriver) Stat(ctx *Context, path string) (FileInfo, error) {
+func (driver *MultiDriver) Stat(ctx *Context, path string) (os.FileInfo, error) {
 	for prefix, driver := range driver.drivers {
 		if strings.HasPrefix(path, prefix) {
 			return driver.Stat(ctx, strings.TrimPrefix(path, prefix))
@@ -88,7 +88,7 @@ func (driver *MultiDriver) Stat(ctx *Context, path string) (FileInfo, error) {
 }
 
 // ListDir implements Driver
-func (driver *MultiDriver) ListDir(ctx *Context, path string, callback func(FileInfo) error) error {
+func (driver *MultiDriver) ListDir(ctx *Context, path string, callback func(os.FileInfo) error) error {
 	for prefix, driver := range driver.drivers {
 		if strings.HasPrefix(path, prefix) {
 			return driver.ListDir(ctx, strings.TrimPrefix(path, prefix), callback)

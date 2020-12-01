@@ -13,7 +13,8 @@ import (
 )
 
 func runServer(t *testing.T, opt *server.ServerOpts, notifiers []server.Notifier, execute func()) {
-	s := server.NewServer(opt)
+	s, err := server.NewServer(opt)
+	assert.NoError(t, err)
 	for _, notifier := range notifiers {
 		s.RegisterNotifer(notifier)
 	}

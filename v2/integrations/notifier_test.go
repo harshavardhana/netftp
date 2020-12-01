@@ -113,7 +113,7 @@ func TestNotification(t *testing.T) {
 	assert.NoError(t, err)
 
 	var perm = server.NewSimplePerm("test", "test")
-	driver, err := file.NewDriver("./testdata", perm)
+	driver, err := file.NewDriver("./testdata")
 	assert.NoError(t, err)
 
 	opt := &server.ServerOpts{
@@ -124,6 +124,7 @@ func TestNotification(t *testing.T) {
 			Name:     "admin",
 			Password: "admin",
 		},
+		Perm:   perm,
 		Logger: new(server.DiscardLogger),
 	}
 

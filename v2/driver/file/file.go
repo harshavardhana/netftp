@@ -18,7 +18,16 @@ import (
 // Driver implements Driver directly read local file system
 type Driver struct {
 	RootPath string
-	server.Perm
+}
+
+// NewDriver implements Driver
+func NewDriver(rootPath string) (server.Driver, error) {
+	var err error
+	rootPath, err = filepath.Abs(rootPath)
+	if err != nil {
+		return nil, err
+	}
+	return &Driver{rootPath}, nil
 }
 
 func (driver *Driver) realPath(path string) string {
@@ -27,36 +36,17 @@ func (driver *Driver) realPath(path string) string {
 }
 
 // Stat implements Driver
-func (driver *Driver) Stat(ctx *server.Context, path string) (server.FileInfo, error) {
+func (driver *Driver) Stat(ctx *server.Context, path string) (os.FileInfo, error) {
 	basepath := driver.realPath(path)
 	rPath, err := filepath.Abs(basepath)
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Lstat(rPath)
-	if err != nil {
-		return nil, err
-	}
-	mode, err := driver.Perm.GetMode(path)
-	if err != nil {
-		return nil, err
-	}
-	if f.IsDir() {
-		mode |= os.ModeDir
-	}
-	owner, err := driver.Perm.GetOwner(path)
-	if err != nil {
-		return nil, err
-	}
-	group, err := driver.Perm.GetGroup(path)
-	if err != nil {
-		return nil, err
-	}
-	return &fileInfo{f, mode, owner, group}, nil
+	return os.Lstat(rPath)
 }
 
 // ListDir implements Driver
-func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(server.FileInfo) error) error {
+func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(os.FileInfo) error) error {
 	basepath := driver.realPath(path)
 	return filepath.Walk(basepath, func(f string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -64,22 +54,7 @@ func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(se
 		}
 		rPath, _ := filepath.Rel(basepath, f)
 		if rPath == info.Name() {
-			mode, err := driver.Perm.GetMode(rPath)
-			if err != nil {
-				return err
-			}
-			if info.IsDir() {
-				mode |= os.ModeDir
-			}
-			owner, err := driver.Perm.GetOwner(rPath)
-			if err != nil {
-				return err
-			}
-			group, err := driver.Perm.GetGroup(rPath)
-			if err != nil {
-				return err
-			}
-			err = callback(&fileInfo{info, mode, owner, group})
+			err = callback(info)
 			if err != nil {
 				return err
 			}
@@ -214,14 +189,4 @@ func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Read
 	}
 
 	return bytes, nil
-}
-
-// NewDriver implements DriverFactory
-func NewDriver(rootPath string, perm server.Perm) (server.Driver, error) {
-	var err error
-	rootPath, err = filepath.Abs(rootPath)
-	if err != nil {
-		return nil, err
-	}
-	return &Driver{rootPath, perm}, nil
 }

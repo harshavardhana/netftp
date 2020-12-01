@@ -7,6 +7,8 @@ package server
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -441,19 +443,19 @@ func (cmd commandList) RequireAuth() bool {
 }
 
 func (cmd commandList) Execute(sess *Session, param string) {
-	path := sess.buildPath(parseListParam(param))
+	p := sess.buildPath(parseListParam(param))
 	info, err := sess.server.Driver.Stat(&Context{
 		Sess:  sess,
 		Cmd:   "LIST",
 		Param: param,
-	}, path)
+	}, p)
 	if err != nil {
 		sess.writeMessage(550, err.Error())
 		return
 	}
 
 	if info == nil {
-		sess.logf("%s: no such file or directory.\n", path)
+		sess.logf("%s: no such file or directory.\n", p)
 		return
 	}
 
@@ -463,8 +465,28 @@ func (cmd commandList) Execute(sess *Session, param string) {
 			Sess:  sess,
 			Cmd:   "LIST",
 			Param: param,
-		}, path, func(f FileInfo) error {
-			files = append(files, f)
+		}, p, func(f os.FileInfo) error {
+			mode, err := sess.server.Perm.GetMode(path.Join(p, f.Name()))
+			if err != nil {
+				return err
+			}
+			if f.IsDir() {
+				mode |= os.ModeDir
+			}
+			owner, err := sess.server.Perm.GetOwner(path.Join(p, f.Name()))
+			if err != nil {
+				return err
+			}
+			group, err := sess.server.Perm.GetGroup(path.Join(p, f.Name()))
+			if err != nil {
+				return err
+			}
+			files = append(files, &fileInfo{
+				FileInfo: f,
+				mode:     mode,
+				owner:    owner,
+				group:    group,
+			})
 			return nil
 		})
 		if err != nil {
@@ -472,7 +494,30 @@ func (cmd commandList) Execute(sess *Session, param string) {
 			return
 		}
 	} else {
-		files = append(files, info)
+		mode, err := sess.server.Perm.GetMode(p)
+		if err != nil {
+			sess.writeMessage(550, err.Error())
+			return
+		}
+		if info.IsDir() {
+			mode |= os.ModeDir
+		}
+		owner, err := sess.server.Perm.GetOwner(p)
+		if err != nil {
+			sess.writeMessage(550, err.Error())
+			return
+		}
+		group, err := sess.server.Perm.GetGroup(p)
+		if err != nil {
+			sess.writeMessage(550, err.Error())
+			return
+		}
+		files = append(files, &fileInfo{
+			FileInfo: info,
+			mode:     mode,
+			owner:    owner,
+			group:    group,
+		})
 	}
 
 	sess.writeMessage(150, "Opening ASCII mode data connection for file list")
@@ -533,8 +578,28 @@ func (cmd commandNlst) Execute(sess *Session, param string) {
 		Sess:  sess,
 		Cmd:   "NLST",
 		Param: param,
-	}, path, func(f FileInfo) error {
-		files = append(files, f)
+	}, path, func(f os.FileInfo) error {
+		mode, err := sess.server.Perm.GetMode(path)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			mode |= os.ModeDir
+		}
+		owner, err := sess.server.Perm.GetOwner(path)
+		if err != nil {
+			return err
+		}
+		group, err := sess.server.Perm.GetGroup(path)
+		if err != nil {
+			return err
+		}
+		files = append(files, &fileInfo{
+			FileInfo: f,
+			mode:     mode,
+			owner:    owner,
+			group:    group,
+		})
 		return nil
 	})
 	if err != nil {

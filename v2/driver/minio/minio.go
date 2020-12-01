@@ -23,8 +23,29 @@ var (
 // Driver implements Driver to store files in minio
 type Driver struct {
 	client *minio.Client
-	perm   server.Perm
 	bucket string
+}
+
+// NewDriver implements DriverFactory
+func NewDriver(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool) (server.Driver, error) {
+	// Initialize minio client object.
+	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, useSSL)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = minioClient.MakeBucket(bucket, location); err != nil {
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(bucket)
+		if !exists || errBucketExists != nil {
+			return nil, err
+		}
+	}
+
+	return &Driver{
+		client: minioClient,
+		bucket: bucket,
+	}, nil
 }
 
 func buildMinioPath(p string) string {
@@ -39,26 +60,10 @@ func buildMinioDir(p string) string {
 	return v
 }
 
-type myPerm struct {
-	server.Perm
-	isDir bool
-}
-
-func (m *myPerm) GetMode(user string) (os.FileMode, error) {
-	mode, err := m.Perm.GetMode(user)
-	if err != nil {
-		return 0, err
-	}
-	if m.isDir {
-		return mode | os.ModeDir, nil
-	}
-	return mode, nil
-}
-
 type minioFileInfo struct {
-	p    string
-	info minio.ObjectInfo
-	perm server.Perm
+	p     string
+	info  minio.ObjectInfo
+	isDir bool
 }
 
 func (m *minioFileInfo) Name() string {
@@ -70,8 +75,7 @@ func (m *minioFileInfo) Size() int64 {
 }
 
 func (m *minioFileInfo) Mode() os.FileMode {
-	mode, _ := m.perm.GetMode(m.p)
-	return mode
+	return os.ModePerm
 }
 
 func (m *minioFileInfo) ModTime() time.Time {
@@ -79,21 +83,11 @@ func (m *minioFileInfo) ModTime() time.Time {
 }
 
 func (m *minioFileInfo) IsDir() bool {
-	return m.Mode().IsDir()
+	return m.isDir
 }
 
 func (m *minioFileInfo) Sys() interface{} {
 	return nil
-}
-
-func (m *minioFileInfo) Owner() string {
-	owner, _ := m.perm.GetOwner(m.p)
-	return owner
-}
-
-func (m *minioFileInfo) Group() string {
-	group, _ := m.perm.GetGroup(m.p)
-	return group
 }
 
 func (driver *Driver) isDir(path string) (bool, error) {
@@ -118,11 +112,11 @@ func (driver *Driver) isDir(path string) (bool, error) {
 }
 
 // Stat implements Driver
-func (driver *Driver) Stat(ctx *server.Context, path string) (server.FileInfo, error) {
+func (driver *Driver) Stat(ctx *server.Context, path string) (os.FileInfo, error) {
 	if path == "/" {
 		return &minioFileInfo{
-			p:    "/",
-			perm: &myPerm{driver.perm, true},
+			p:     "/",
+			isDir: true,
 		}, nil
 	}
 
@@ -133,22 +127,22 @@ func (driver *Driver) Stat(ctx *server.Context, path string) (server.FileInfo, e
 			return nil, err
 		} else if isDir {
 			return &minioFileInfo{
-				p:    path,
-				perm: &myPerm{driver.perm, true},
+				p:     path,
+				isDir: true,
 			}, nil
 		}
 		return nil, errors.New("Not a directory")
 	}
 	isDir := strings.HasSuffix(objInfo.Key, "/")
 	return &minioFileInfo{
-		p:    p,
-		info: objInfo,
-		perm: &myPerm{driver.perm, isDir},
+		p:     p,
+		info:  objInfo,
+		isDir: isDir,
 	}, nil
 }
 
 // ListDir implements Driver
-func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(server.FileInfo) error) error {
+func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(os.FileInfo) error) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -169,9 +163,9 @@ func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(se
 
 		isDir := strings.HasSuffix(object.Key, "/")
 		info := minioFileInfo{
-			p:    strings.TrimPrefix(object.Key, p),
-			info: object,
-			perm: &myPerm{driver.perm, isDir},
+			p:     strings.TrimPrefix(object.Key, p),
+			info:  object,
+			isDir: isDir,
 		}
 
 		if err := callback(&info); err != nil {
@@ -282,27 +276,4 @@ func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Read
 	}
 
 	return size, driver.client.ComposeObject(dst, srcs)
-}
-
-// NewDriver implements DriverFactory
-func NewDriver(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool, perm server.Perm) (server.Driver, error) {
-	// Initialize minio client object.
-	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, useSSL)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = minioClient.MakeBucket(bucket, location); err != nil {
-		// Check to see if we already own this bucket (which happens if you run this twice)
-		exists, errBucketExists := minioClient.BucketExists(bucket)
-		if !exists || errBucketExists != nil {
-			return nil, err
-		}
-	}
-
-	return &Driver{
-		client: minioClient,
-		bucket: bucket,
-		perm:   perm,
-	}, nil
 }

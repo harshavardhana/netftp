@@ -31,6 +31,9 @@ type ServerOpts struct {
 	// How to hanle the authenticate requests
 	Auth Auth
 
+	// How to handle the perm controls
+	Perm Perm
+
 	// Server Name, Default is Go Ftp Server
 	Name string
 
@@ -133,6 +136,7 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 		newOpts.Commands = defaultCommands
 	}
 
+	newOpts.Perm = opts.Perm
 	newOpts.TLS = opts.TLS
 	newOpts.KeyFile = opts.KeyFile
 	newOpts.CertFile = opts.CertFile
@@ -151,13 +155,18 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 //     driver := &MyDriver{}
 //     opts    := &server.ServerOpts{
 //       Driver: driver,
+//       Auth: auth,
 //       Port: 2000,
+//       Perm: perm,
 //       Hostname: "127.0.0.1",
 //     }
-//     server  := server.NewServer(opts)
+//     server, err  := server.NewServer(opts)
 //
-func NewServer(opts *ServerOpts) *Server {
+func NewServer(opts *ServerOpts) (*Server, error) {
 	opts = serverOptsWithDefaults(opts)
+	if opts.Perm == nil {
+		return nil, errors.New("No perm implementation")
+	}
 	s := new(Server)
 	s.ServerOpts = opts
 	s.listenTo = net.JoinHostPort(opts.Hostname, strconv.Itoa(opts.Port))
@@ -179,7 +188,7 @@ func NewServer(opts *ServerOpts) *Server {
 	}
 	s.feats = fmt.Sprintf(feats, featCmds)
 
-	return s
+	return s, nil
 }
 
 // RegisterNotifer registers a notifier

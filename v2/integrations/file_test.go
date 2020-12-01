@@ -24,12 +24,13 @@ func TestFileDriver(t *testing.T) {
 	assert.NoError(t, err)
 
 	var perm = server.NewSimplePerm("test", "test")
-	driver, err := file.NewDriver("./testdata", perm)
+	driver, err := file.NewDriver("./testdata")
 	assert.NoError(t, err)
 
 	opt := &server.ServerOpts{
 		Name:   "test ftpd",
 		Driver: driver,
+		Perm:   perm,
 		Port:   2122,
 		Auth: &server.SimpleAuth{
 			Name:     "admin",
@@ -129,7 +130,7 @@ func TestLogin(t *testing.T) {
 	assert.NoError(t, err)
 
 	var perm = server.NewSimplePerm("test", "test")
-	driver, err := file.NewDriver("./testdata", perm)
+	driver, err := file.NewDriver("./testdata")
 	assert.NoError(t, err)
 
 	// Server options without hostname or port
@@ -140,6 +141,7 @@ func TestLogin(t *testing.T) {
 			Name:     "admin",
 			Password: "admin",
 		},
+		Perm:   perm,
 		Logger: new(server.DiscardLogger),
 	}
 
@@ -148,7 +150,8 @@ func TestLogin(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start the server using the listener
-	s := server.NewServer(opt)
+	s, err := server.NewServer(opt)
+	assert.NoError(t, err)
 	go func() {
 		err := s.Serve(l)
 		assert.EqualError(t, err, server.ErrServerClosed.Error())

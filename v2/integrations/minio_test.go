@@ -31,7 +31,7 @@ func TestDriver(t *testing.T) {
 	bucket := os.Getenv("MINIO_SERVER_BUCKET")
 	useSSL, _ := strconv.ParseBool(os.Getenv("MINIO_SERVER_USE_SSL"))
 
-	minioDriver, err := minio.NewDriver(endpoint, accessKeyID, secretKey, location, bucket, useSSL, server.NewSimplePerm("root", "root"))
+	minioDriver, err := minio.NewDriver(endpoint, accessKeyID, secretKey, location, bucket, useSSL)
 	assert.NoError(t, err)
 	opt := &server.ServerOpts{
 		Name:   "test ftpd",
@@ -41,6 +41,7 @@ func TestDriver(t *testing.T) {
 			Name:     "admin",
 			Password: "admin",
 		},
+		Perm:   server.NewSimplePerm("root", "root"),
 		Logger: new(server.DiscardLogger),
 	}
 
