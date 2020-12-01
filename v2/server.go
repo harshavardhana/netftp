@@ -21,6 +21,10 @@ func Version() string {
 
 // ServerOpts contains parameters for server.NewServer()
 type ServerOpts struct {
+	// This server supported commands, if blank, it will be defaultCommands
+	// So that users could override the Commands
+	Commands map[string]Command
+
 	// The driver that will be used to handle files persistent
 	Driver Driver
 
@@ -125,6 +129,10 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 		newOpts.Logger = &StdLogger{}
 	}
 
+	if opts.Commands == nil {
+		newOpts.Commands = defaultCommands
+	}
+
 	newOpts.TLS = opts.TLS
 	newOpts.KeyFile = opts.KeyFile
 	newOpts.CertFile = opts.CertFile
@@ -154,11 +162,22 @@ func NewServer(opts *ServerOpts) *Server {
 	s.ServerOpts = opts
 	s.listenTo = net.JoinHostPort(opts.Hostname, strconv.Itoa(opts.Port))
 	s.logger = opts.Logger
-	var curFeats = featCmds
-	if opts.TLS {
-		curFeats += " AUTH TLS\n PBSZ\n PROT\n"
+
+	var (
+		feats    = "Extensions supported:\n%s"
+		featCmds = " UTF8\n"
+	)
+
+	for k, v := range s.Commands {
+		if v.IsExtend() {
+			featCmds = featCmds + " " + k + "\n"
+		}
 	}
-	s.feats = fmt.Sprintf(feats, curFeats)
+
+	if opts.TLS {
+		featCmds += " AUTH TLS\n PBSZ\n PROT\n"
+	}
+	s.feats = fmt.Sprintf(feats, featCmds)
 
 	return s
 }
@@ -180,6 +199,14 @@ func (server *Server) newSession(id string, tcpConn net.Conn) *Session {
 		controlReader: bufio.NewReader(tcpConn),
 		controlWriter: bufio.NewWriter(tcpConn),
 		curDir:        "/",
+		reqUser:       "",
+		user:          "",
+		renameFrom:    "",
+		lastFilePos:   0,
+		appendData:    false,
+		closed:        false,
+		tls:           false,
+		Data:          make(map[string]interface{}),
 	}
 }
 

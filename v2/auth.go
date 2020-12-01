@@ -10,7 +10,7 @@ import (
 
 // Auth is an interface to auth your ftp user login.
 type Auth interface {
-	CheckPasswd(string, string) (bool, error)
+	CheckPasswd(*Context, string, string) (bool, error)
 }
 
 var (
@@ -24,7 +24,7 @@ type SimpleAuth struct {
 }
 
 // CheckPasswd will check user's password
-func (a *SimpleAuth) CheckPasswd(name, pass string) (bool, error) {
+func (a *SimpleAuth) CheckPasswd(ctx *Context, name, pass string) (bool, error) {
 	return constantTimeEquals(name, a.Name) && constantTimeEquals(pass, a.Password), nil
 }
 

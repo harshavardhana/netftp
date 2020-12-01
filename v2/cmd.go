@@ -19,10 +19,8 @@ type Command interface {
 	Execute(*Session, string)
 }
 
-type commandMap map[string]Command
-
 var (
-	commands = commandMap{
+	defaultCommands = map[string]Command{
 		"ADAT": commandAdat{},
 		"ALLO": commandAllo{},
 		"APPE": commandAppe{},
@@ -174,19 +172,6 @@ func (cmd commandFeat) RequireParam() bool {
 
 func (cmd commandFeat) RequireAuth() bool {
 	return false
-}
-
-var (
-	feats    = "Extensions supported:\n%s"
-	featCmds = " UTF8\n"
-)
-
-func init() {
-	for k, v := range commands {
-		if v.IsExtend() {
-			featCmds = featCmds + " " + k + "\n"
-		}
-	}
 }
 
 func (cmd commandFeat) Execute(sess *Session, param string) {
@@ -695,12 +680,13 @@ func (cmd commandPass) Execute(sess *Session, param string) {
 	if driverAuth, found := sess.server.Driver.(Auth); found {
 		auth = driverAuth
 	}
-	ok, err := auth.CheckPasswd(sess.reqUser, param)
-	sess.server.notifiers.AfterUserLogin(&Context{
+	var ctx = Context{
 		Sess:  sess,
 		Cmd:   "PASS",
 		Param: param,
-	}, sess.reqUser, param, ok, err)
+	}
+	ok, err := auth.CheckPasswd(&ctx, sess.reqUser, param)
+	sess.server.notifiers.AfterUserLogin(&ctx, sess.reqUser, param, ok, err)
 	if err != nil {
 		sess.writeMessage(550, "Checking password error")
 		return

@@ -42,6 +42,7 @@ type Session struct {
 	appendData    bool
 	closed        bool
 	tls           bool
+	Data          map[string]interface{} // shared data between different commands
 }
 
 // RemoteAddr returns the remote ftp client's address
@@ -198,6 +199,7 @@ func (sess *Session) receiveLine(line string) {
 
 	command, param := sess.parseLine(line)
 	sess.server.Logger.PrintCommand(sess.id, command, param)
+	commands := sess.server.Commands
 	cmdObj := commands[strings.ToUpper(command)]
 	if cmdObj == nil {
 		sess.writeMessage(500, "Command not found")
