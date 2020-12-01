@@ -14,11 +14,6 @@ import (
 	"strconv"
 )
 
-// Version returns the library version
-func Version() string {
-	return "0.4.0"
-}
-
 // ServerOpts contains parameters for server.NewServer()
 type ServerOpts struct {
 	// This server supported commands, if blank, it will be defaultCommands

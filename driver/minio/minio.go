@@ -13,18 +13,39 @@ import (
 	"time"
 
 	minio "github.com/minio/minio-go/v6"
-	"goftp.io/server/core"
+	"goftp.io/server/v2"
 )
 
 var (
-	_ core.Driver = &Driver{}
+	_ server.Driver = &Driver{}
 )
 
 // Driver implements Driver to store files in minio
 type Driver struct {
 	client *minio.Client
-	perm   core.Perm
 	bucket string
+}
+
+// NewDriver implements DriverFactory
+func NewDriver(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool) (server.Driver, error) {
+	// Initialize minio client object.
+	minioClient, err := minio.New(endpoint, accessKeyID, secretAccessKey, useSSL)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = minioClient.MakeBucket(bucket, location); err != nil {
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(bucket)
+		if !exists || errBucketExists != nil {
+			return nil, err
+		}
+	}
+
+	return &Driver{
+		client: minioClient,
+		bucket: bucket,
+	}, nil
 }
 
 func buildMinioPath(p string) string {
@@ -39,26 +60,10 @@ func buildMinioDir(p string) string {
 	return v
 }
 
-type myPerm struct {
-	core.Perm
-	isDir bool
-}
-
-func (m *myPerm) GetMode(user string) (os.FileMode, error) {
-	mode, err := m.Perm.GetMode(user)
-	if err != nil {
-		return 0, err
-	}
-	if m.isDir {
-		return mode | os.ModeDir, nil
-	}
-	return mode, nil
-}
-
 type minioFileInfo struct {
-	p    string
-	info minio.ObjectInfo
-	perm core.Perm
+	p     string
+	info  minio.ObjectInfo
+	isDir bool
 }
 
 func (m *minioFileInfo) Name() string {
@@ -70,8 +75,7 @@ func (m *minioFileInfo) Size() int64 {
 }
 
 func (m *minioFileInfo) Mode() os.FileMode {
-	mode, _ := m.perm.GetMode(m.p)
-	return mode
+	return os.ModePerm
 }
 
 func (m *minioFileInfo) ModTime() time.Time {
@@ -79,21 +83,11 @@ func (m *minioFileInfo) ModTime() time.Time {
 }
 
 func (m *minioFileInfo) IsDir() bool {
-	return m.Mode().IsDir()
+	return m.isDir
 }
 
 func (m *minioFileInfo) Sys() interface{} {
 	return nil
-}
-
-func (m *minioFileInfo) Owner() string {
-	owner, _ := m.perm.GetOwner(m.p)
-	return owner
-}
-
-func (m *minioFileInfo) Group() string {
-	group, _ := m.perm.GetGroup(m.p)
-	return group
 }
 
 func (driver *Driver) isDir(path string) (bool, error) {
@@ -118,11 +112,11 @@ func (driver *Driver) isDir(path string) (bool, error) {
 }
 
 // Stat implements Driver
-func (driver *Driver) Stat(path string) (core.FileInfo, error) {
+func (driver *Driver) Stat(ctx *server.Context, path string) (os.FileInfo, error) {
 	if path == "/" {
 		return &minioFileInfo{
-			p:    "/",
-			perm: &myPerm{driver.perm, true},
+			p:     "/",
+			isDir: true,
 		}, nil
 	}
 
@@ -133,22 +127,22 @@ func (driver *Driver) Stat(path string) (core.FileInfo, error) {
 			return nil, err
 		} else if isDir {
 			return &minioFileInfo{
-				p:    path,
-				perm: &myPerm{driver.perm, true},
+				p:     path,
+				isDir: true,
 			}, nil
 		}
 		return nil, errors.New("Not a directory")
 	}
 	isDir := strings.HasSuffix(objInfo.Key, "/")
 	return &minioFileInfo{
-		p:    p,
-		info: objInfo,
-		perm: &myPerm{driver.perm, isDir},
+		p:     p,
+		info:  objInfo,
+		isDir: isDir,
 	}, nil
 }
 
 // ListDir implements Driver
-func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) error {
+func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(os.FileInfo) error) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -169,9 +163,9 @@ func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) e
 
 		isDir := strings.HasSuffix(object.Key, "/")
 		info := minioFileInfo{
-			p:    strings.TrimPrefix(object.Key, p),
-			info: object,
-			perm: &myPerm{driver.perm, isDir},
+			p:     strings.TrimPrefix(object.Key, p),
+			info:  object,
+			isDir: isDir,
 		}
 
 		if err := callback(&info); err != nil {
@@ -183,7 +177,7 @@ func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) e
 }
 
 // DeleteDir implements Driver
-func (driver *Driver) DeleteDir(path string) error {
+func (driver *Driver) DeleteDir(ctx *server.Context, path string) error {
 	doneCh := make(chan struct{})
 	defer close(doneCh)
 
@@ -202,12 +196,12 @@ func (driver *Driver) DeleteDir(path string) error {
 }
 
 // DeleteFile implements Driver
-func (driver *Driver) DeleteFile(path string) error {
+func (driver *Driver) DeleteFile(ctx *server.Context, path string) error {
 	return driver.client.RemoveObject(driver.bucket, buildMinioPath(path))
 }
 
 // Rename implements Driver
-func (driver *Driver) Rename(fromPath string, toPath string) error {
+func (driver *Driver) Rename(ctx *server.Context, fromPath string, toPath string) error {
 	src := minio.NewSourceInfo(driver.bucket, buildMinioPath(fromPath), nil)
 	dst, err := minio.NewDestinationInfo(driver.bucket, buildMinioPath(toPath), nil, nil)
 	if err != nil {
@@ -222,14 +216,14 @@ func (driver *Driver) Rename(fromPath string, toPath string) error {
 }
 
 // MakeDir implements Driver
-func (driver *Driver) MakeDir(path string) error {
+func (driver *Driver) MakeDir(ctx *server.Context, path string) error {
 	dirPath := buildMinioDir(path)
 	_, err := driver.client.PutObject(driver.bucket, dirPath, nil, 0, minio.PutObjectOptions{})
 	return err
 }
 
 // GetFile implements Driver
-func (driver *Driver) GetFile(path string, offset int64) (int64, io.ReadCloser, error) {
+func (driver *Driver) GetFile(ctx *server.Context, path string, offset int64) (int64, io.ReadCloser, error) {
 	var opts = minio.GetObjectOptions{}
 	object, err := driver.client.GetObject(driver.bucket, buildMinioPath(path), opts)
 	if err != nil {
@@ -254,21 +248,17 @@ func (driver *Driver) GetFile(path string, offset int64) (int64, io.ReadCloser, 
 }
 
 // PutFile implements Driver
-func (driver *Driver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, appendData bool) (int64, error) {
 	p := buildMinioPath(destPath)
 	if !appendData {
 		return driver.client.PutObject(driver.bucket, p, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	}
 
 	tempFile := p + ".tmp"
-	//tempDstFile := p + ".dst"
 	defer func() {
-		if err := driver.DeleteFile(tempFile); err != nil {
+		if err := driver.DeleteFile(ctx, tempFile); err != nil {
 			log.Println(err)
 		}
-		/*if err := driver.DeleteFile(tempDstFile); err != nil {
-			log.Println(err)
-		}*/
 	}()
 
 	size, err := driver.client.PutObject(driver.bucket, tempFile, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
@@ -286,51 +276,4 @@ func (driver *Driver) PutFile(destPath string, data io.Reader, appendData bool) 
 	}
 
 	return size, driver.client.ComposeObject(dst, srcs)
-}
-
-// DriverFactory implements DriverFactory
-type DriverFactory struct {
-	endpoint        string
-	accessKeyID     string
-	secretAccessKey string
-	useSSL          bool
-	location        string
-	bucket          string
-	perm            core.Perm
-}
-
-// NewDriverFactory creates a DriverFactory implementation
-func NewDriverFactory(endpoint, accessKeyID, secretAccessKey, location, bucket string, useSSL bool, perm core.Perm) *DriverFactory {
-	return &DriverFactory{
-		endpoint:        endpoint,
-		accessKeyID:     accessKeyID,
-		secretAccessKey: secretAccessKey,
-		useSSL:          useSSL,
-		location:        location,
-		bucket:          bucket,
-		perm:            perm,
-	}
-}
-
-// NewDriver implements DriverFactory
-func (factory *DriverFactory) NewDriver() (core.Driver, error) {
-	// Initialize minio client object.
-	minioClient, err := minio.New(factory.endpoint, factory.accessKeyID, factory.secretAccessKey, factory.useSSL)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = minioClient.MakeBucket(factory.bucket, factory.location); err != nil {
-		// Check to see if we already own this bucket (which happens if you run this twice)
-		exists, errBucketExists := minioClient.BucketExists(factory.bucket)
-		if !exists || errBucketExists != nil {
-			return nil, err
-		}
-	}
-
-	return &Driver{
-		client: minioClient,
-		bucket: factory.bucket,
-		perm:   factory.perm,
-	}, nil
 }

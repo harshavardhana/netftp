@@ -9,13 +9,13 @@ Full documentation for the package is available on [godoc](http://pkg.go.dev/gof
 
 ## Installation
 
-    go get goftp.io/server
+    go get goftp.io/server/v1
 
 ## Usage
 
 To boot a FTP server you will need to provide a driver that speaks to
 your persistence layer - the required driver contract is in [the
-documentation](http://pkg.go.dev/goftp.io/server/core).
+documentation](http://pkg.go.dev/goftp.io/server).
 
 Look at the [file driver](https://goftp.io/server/driver/file) to see
 an example of how to build a backend.

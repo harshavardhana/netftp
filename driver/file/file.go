@@ -12,13 +12,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"goftp.io/server/core"
+	"goftp.io/server/v2"
 )
 
 // Driver implements Driver directly read local file system
 type Driver struct {
 	RootPath string
-	core.Perm
+}
+
+// NewDriver implements Driver
+func NewDriver(rootPath string) (server.Driver, error) {
+	var err error
+	rootPath, err = filepath.Abs(rootPath)
+	if err != nil {
+		return nil, err
+	}
+	return &Driver{rootPath}, nil
 }
 
 func (driver *Driver) realPath(path string) string {
@@ -27,36 +36,17 @@ func (driver *Driver) realPath(path string) string {
 }
 
 // Stat implements Driver
-func (driver *Driver) Stat(path string) (core.FileInfo, error) {
+func (driver *Driver) Stat(ctx *server.Context, path string) (os.FileInfo, error) {
 	basepath := driver.realPath(path)
 	rPath, err := filepath.Abs(basepath)
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Lstat(rPath)
-	if err != nil {
-		return nil, err
-	}
-	mode, err := driver.Perm.GetMode(path)
-	if err != nil {
-		return nil, err
-	}
-	if f.IsDir() {
-		mode |= os.ModeDir
-	}
-	owner, err := driver.Perm.GetOwner(path)
-	if err != nil {
-		return nil, err
-	}
-	group, err := driver.Perm.GetGroup(path)
-	if err != nil {
-		return nil, err
-	}
-	return &fileInfo{f, mode, owner, group}, nil
+	return os.Lstat(rPath)
 }
 
 // ListDir implements Driver
-func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) error {
+func (driver *Driver) ListDir(ctx *server.Context, path string, callback func(os.FileInfo) error) error {
 	basepath := driver.realPath(path)
 	return filepath.Walk(basepath, func(f string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -64,22 +54,7 @@ func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) e
 		}
 		rPath, _ := filepath.Rel(basepath, f)
 		if rPath == info.Name() {
-			mode, err := driver.Perm.GetMode(rPath)
-			if err != nil {
-				return err
-			}
-			if info.IsDir() {
-				mode |= os.ModeDir
-			}
-			owner, err := driver.Perm.GetOwner(rPath)
-			if err != nil {
-				return err
-			}
-			group, err := driver.Perm.GetGroup(rPath)
-			if err != nil {
-				return err
-			}
-			err = callback(&fileInfo{info, mode, owner, group})
+			err = callback(info)
 			if err != nil {
 				return err
 			}
@@ -92,7 +67,7 @@ func (driver *Driver) ListDir(path string, callback func(core.FileInfo) error) e
 }
 
 // DeleteDir implements Driver
-func (driver *Driver) DeleteDir(path string) error {
+func (driver *Driver) DeleteDir(ctx *server.Context, path string) error {
 	rPath := driver.realPath(path)
 	f, err := os.Lstat(rPath)
 	if err != nil {
@@ -105,7 +80,7 @@ func (driver *Driver) DeleteDir(path string) error {
 }
 
 // DeleteFile implements Driver
-func (driver *Driver) DeleteFile(path string) error {
+func (driver *Driver) DeleteFile(ctx *server.Context, path string) error {
 	rPath := driver.realPath(path)
 	f, err := os.Lstat(rPath)
 	if err != nil {
@@ -118,20 +93,20 @@ func (driver *Driver) DeleteFile(path string) error {
 }
 
 // Rename implements Driver
-func (driver *Driver) Rename(fromPath string, toPath string) error {
+func (driver *Driver) Rename(ctx *server.Context, fromPath string, toPath string) error {
 	oldPath := driver.realPath(fromPath)
 	newPath := driver.realPath(toPath)
 	return os.Rename(oldPath, newPath)
 }
 
 // MakeDir implements Driver
-func (driver *Driver) MakeDir(path string) error {
+func (driver *Driver) MakeDir(ctx *server.Context, path string) error {
 	rPath := driver.realPath(path)
 	return os.MkdirAll(rPath, os.ModePerm)
 }
 
 // GetFile implements Driver
-func (driver *Driver) GetFile(path string, offset int64) (int64, io.ReadCloser, error) {
+func (driver *Driver) GetFile(ctx *server.Context, path string, offset int64) (int64, io.ReadCloser, error) {
 	rPath := driver.realPath(path)
 	f, err := os.Open(rPath)
 	if err != nil {
@@ -157,7 +132,7 @@ func (driver *Driver) GetFile(path string, offset int64) (int64, io.ReadCloser, 
 }
 
 // PutFile implements Driver
-func (driver *Driver) PutFile(destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, appendData bool) (int64, error) {
 	rPath := driver.realPath(destPath)
 	var isExist bool
 	f, err := os.Lstat(rPath)
@@ -214,20 +189,4 @@ func (driver *Driver) PutFile(destPath string, data io.Reader, appendData bool) 
 	}
 
 	return bytes, nil
-}
-
-// DriverFactory implements DriverFactory
-type DriverFactory struct {
-	RootPath string
-	core.Perm
-}
-
-// NewDriver implements DriverFactory
-func (factory *DriverFactory) NewDriver() (core.Driver, error) {
-	var err error
-	factory.RootPath, err = filepath.Abs(factory.RootPath)
-	if err != nil {
-		return nil, err
-	}
-	return &Driver{factory.RootPath, factory.Perm}, nil
 }
