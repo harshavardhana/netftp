@@ -5,6 +5,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -41,6 +42,7 @@ var (
 		"NLST": commandNlst{},
 		"MDTM": commandMdtm{},
 		"MIC":  commandMic{},
+		"MLSD": commandMLSD{},
 		"MKD":  commandMkd{},
 		"MODE": commandMode{},
 		"NOOP": commandNoop{},
@@ -442,28 +444,26 @@ func (cmd commandList) RequireAuth() bool {
 	return true
 }
 
-func (cmd commandList) Execute(sess *Session, param string) {
-	p := sess.buildPath(parseListParam(param))
+func list(sess *Session, cmd, p, param string) ([]FileInfo, error) {
 	info, err := sess.server.Driver.Stat(&Context{
 		Sess:  sess,
-		Cmd:   "LIST",
+		Cmd:   cmd,
 		Param: param,
 	}, p)
 	if err != nil {
-		sess.writeMessage(550, err.Error())
-		return
+		return nil, err
 	}
 
 	if info == nil {
 		sess.logf("%s: no such file or directory.\n", p)
-		return
+		return []FileInfo{}, nil
 	}
 
 	var files []FileInfo
 	if info.IsDir() {
 		err = sess.server.Driver.ListDir(&Context{
 			Sess:  sess,
-			Cmd:   "LIST",
+			Cmd:   cmd,
 			Param: param,
 		}, p, func(f os.FileInfo) error {
 			mode, err := sess.server.Perm.GetMode(path.Join(p, f.Name()))
@@ -490,27 +490,23 @@ func (cmd commandList) Execute(sess *Session, param string) {
 			return nil
 		})
 		if err != nil {
-			sess.writeMessage(550, err.Error())
-			return
+			return nil, err
 		}
 	} else {
 		mode, err := sess.server.Perm.GetMode(p)
 		if err != nil {
-			sess.writeMessage(550, err.Error())
-			return
+			return nil, err
 		}
 		if info.IsDir() {
 			mode |= os.ModeDir
 		}
 		owner, err := sess.server.Perm.GetOwner(p)
 		if err != nil {
-			sess.writeMessage(550, err.Error())
-			return
+			return nil, err
 		}
 		group, err := sess.server.Perm.GetGroup(p)
 		if err != nil {
-			sess.writeMessage(550, err.Error())
-			return
+			return nil, err
 		}
 		files = append(files, &fileInfo{
 			FileInfo: info,
@@ -518,6 +514,17 @@ func (cmd commandList) Execute(sess *Session, param string) {
 			owner:    owner,
 			group:    group,
 		})
+	}
+	return files, nil
+}
+
+func (cmd commandList) Execute(sess *Session, param string) {
+	p := sess.buildPath(parseListParam(param))
+
+	files, err := list(sess, "LIST", p, param)
+	if err != nil {
+		sess.writeMessage(550, err.Error())
+		return
 	}
 
 	sess.writeMessage(150, "Opening ASCII mode data connection for file list")
@@ -1136,6 +1143,51 @@ func (cmd commandMic) RequireAuth() bool {
 
 func (cmd commandMic) Execute(sess *Session, param string) {
 	sess.writeMessage(550, "Action not taken")
+}
+
+type commandMLSD struct{}
+
+func (cmd commandMLSD) IsExtend() bool {
+	return true
+}
+
+func (cmd commandMLSD) RequireParam() bool {
+	return true
+}
+
+func (cmd commandMLSD) RequireAuth() bool {
+	return true
+}
+
+func toMLSDFormat(files []FileInfo) []byte {
+	var buf bytes.Buffer
+	for _, file := range files {
+		var fileType = "file"
+		if file.IsDir() {
+			fileType = "dir"
+		}
+		fmt.Fprintf(&buf,
+			"type=%s;modify=%s;size=%s; %s\n",
+			fileType,
+			file.ModTime().Format("20060102150405"),
+			file.Size(),
+			file.Name(),
+		)
+	}
+	return buf.Bytes()
+}
+
+func (cmd commandMLSD) Execute(sess *Session, param string) {
+	p := sess.buildPath(param)
+
+	files, err := list(sess, "LIST", p, param)
+	if err != nil {
+		sess.writeMessage(550, err.Error())
+		return
+	}
+
+	sess.writeMessage(150, "Opening ASCII mode data connection for file list")
+	sess.sendOutofbandData(toMLSDFormat(files))
 }
 
 type commandPbsz struct{}
