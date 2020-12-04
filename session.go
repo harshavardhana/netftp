@@ -39,7 +39,7 @@ type Session struct {
 	user          string
 	renameFrom    string
 	lastFilePos   int64
-	appendData    bool
+	preCommand    string
 	closed        bool
 	tls           bool
 	Data          map[string]interface{} // shared data between different commands
@@ -199,8 +199,12 @@ func (sess *Session) receiveLine(line string) {
 
 	command, param := sess.parseLine(line)
 	sess.server.Logger.PrintCommand(sess.id, command, param)
-	commands := sess.server.Commands
-	cmdObj := commands[strings.ToUpper(command)]
+
+	var (
+		commands = sess.server.Commands
+		theCmd   = strings.ToUpper(command)
+		cmdObj   = commands[theCmd]
+	)
 	if cmdObj == nil {
 		sess.writeMessage(500, "Command not found")
 		return
@@ -213,6 +217,7 @@ func (sess *Session) receiveLine(line string) {
 		sess.writeMessage(530, "not logged in")
 	} else {
 		cmdObj.Execute(sess, param)
+		sess.preCommand = theCmd
 	}
 }
 
@@ -284,7 +289,6 @@ func (sess *Session) sendOutofbandData(data []byte) {
 }
 
 func (sess *Session) sendOutofBandDataWriter(data io.ReadCloser) error {
-	sess.lastFilePos = 0
 	bytes, err := io.Copy(sess.dataConn, data)
 	if err != nil {
 		sess.dataConn.Close()

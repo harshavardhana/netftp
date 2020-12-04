@@ -6,6 +6,7 @@ package minio
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -248,9 +249,9 @@ func (driver *Driver) GetFile(ctx *server.Context, path string, offset int64) (i
 }
 
 // PutFile implements Driver
-func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, offset int64) (int64, error) {
 	p := buildMinioPath(destPath)
-	if !appendData {
+	if offset == -1 {
 		return driver.client.PutObject(driver.bucket, p, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	}
 
@@ -260,6 +261,14 @@ func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Read
 			log.Println(err)
 		}
 	}()
+
+	info, err := driver.client.StatObject(driver.bucket, p, minio.StatObjectOptions{})
+	if err != nil {
+		return 0, err
+	}
+	if offset != info.Size {
+		return 0, fmt.Errorf("It's unsupported that offset %d is not equal to %d", offset, info.Size)
+	}
 
 	size, err := driver.client.PutObject(driver.bucket, tempFile, data, -1, minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	if err != nil {

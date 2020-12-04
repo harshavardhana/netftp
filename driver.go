@@ -60,7 +60,7 @@ type Driver interface {
 
 	// params  - destination path, an io.Reader containing the file data
 	// returns - the number of bytes writen and the first error encountered while writing, if any.
-	PutFile(*Context, string, io.Reader, bool) (int64, error)
+	PutFile(*Context, string, io.Reader, int64) (int64, error)
 }
 
 var _ Driver = &MultiDriver{}
@@ -151,10 +151,10 @@ func (driver *MultiDriver) GetFile(ctx *Context, path string, offset int64) (int
 }
 
 // PutFile implements Driver
-func (driver *MultiDriver) PutFile(ctx *Context, destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *MultiDriver) PutFile(ctx *Context, destPath string, data io.Reader, offset int64) (int64, error) {
 	for prefix, driver := range driver.drivers {
 		if strings.HasPrefix(destPath, prefix) {
-			return driver.PutFile(ctx, strings.TrimPrefix(destPath, prefix), data, appendData)
+			return driver.PutFile(ctx, strings.TrimPrefix(destPath, prefix), data, offset)
 		}
 	}
 

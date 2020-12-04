@@ -115,13 +115,20 @@ func (cmd commandAppe) Execute(sess *Session, param string) {
 	targetPath := sess.buildPath(param)
 	sess.writeMessage(150, "Data transfer starting")
 
+	if sess.preCommand != "REST" {
+		sess.lastFilePos = -1
+	}
+	defer func() {
+		sess.lastFilePos = -1
+	}()
+
 	var ctx = Context{
 		Sess:  sess,
 		Cmd:   "APPE",
 		Param: param,
 	}
 	sess.server.notifiers.BeforePutFile(&ctx, targetPath)
-	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, true)
+	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, sess.lastFilePos)
 	sess.server.notifiers.AfterFilePut(&ctx, targetPath, size, err)
 	if err == nil {
 		msg := fmt.Sprintf("OK, received %d bytes", size)
@@ -891,6 +898,7 @@ func (cmd commandQuit) Execute(sess *Session, param string) {
 
 // commandRetr responds to the RETR FTP command. It allows the client to
 // download a file.
+// REST can be followed by APPE, STOR, or RETR
 type commandRetr struct{}
 
 func (cmd commandRetr) IsExtend() bool {
@@ -907,9 +915,11 @@ func (cmd commandRetr) RequireAuth() bool {
 
 func (cmd commandRetr) Execute(sess *Session, param string) {
 	path := sess.buildPath(param)
+	if sess.preCommand != "REST" {
+		sess.lastFilePos = -1
+	}
 	defer func() {
-		sess.lastFilePos = 0
-		sess.appendData = false
+		sess.lastFilePos = -1
 	}()
 	var ctx = Context{
 		Sess:  sess,
@@ -917,7 +927,11 @@ func (cmd commandRetr) Execute(sess *Session, param string) {
 		Param: param,
 	}
 	sess.server.notifiers.BeforeDownloadFile(&ctx, path)
-	size, data, err := sess.server.Driver.GetFile(&ctx, path, sess.lastFilePos)
+	var readPos = sess.lastFilePos
+	if readPos < 0 {
+		readPos = 0
+	}
+	size, data, err := sess.server.Driver.GetFile(&ctx, path, readPos)
 	if err == nil {
 		defer data.Close()
 		sess.writeMessage(150, fmt.Sprintf("Data transfer starting %d bytes", size))
@@ -953,8 +967,6 @@ func (cmd commandRest) Execute(sess *Session, param string) {
 		sess.writeMessage(551, "File not available")
 		return
 	}
-
-	sess.appendData = true
 
 	sess.writeMessage(350, fmt.Sprint("Start transfer from ", sess.lastFilePos))
 }
@@ -1305,8 +1317,12 @@ func (cmd commandStor) Execute(sess *Session, param string) {
 	targetPath := sess.buildPath(param)
 	sess.writeMessage(150, "Data transfer starting")
 
+	if sess.preCommand != "REST" {
+		sess.lastFilePos = -1
+	}
+
 	defer func() {
-		sess.appendData = false
+		sess.lastFilePos = -1
 	}()
 
 	var ctx = Context{
@@ -1315,7 +1331,7 @@ func (cmd commandStor) Execute(sess *Session, param string) {
 		Param: param,
 	}
 	sess.server.notifiers.BeforePutFile(&ctx, targetPath)
-	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, sess.appendData)
+	size, err := sess.server.Driver.PutFile(&ctx, targetPath, sess.dataConn, sess.lastFilePos)
 	sess.server.notifiers.AfterFilePut(&ctx, targetPath, size, err)
 	if err == nil {
 		msg := fmt.Sprintf("OK, received %d bytes", size)

@@ -132,7 +132,7 @@ func (driver *Driver) GetFile(ctx *server.Context, path string, offset int64) (i
 }
 
 // PutFile implements Driver
-func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, appendData bool) (int64, error) {
+func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Reader, offset int64) (int64, error) {
 	rPath := driver.realPath(destPath)
 	var isExist bool
 	f, err := os.Lstat(rPath)
@@ -149,11 +149,11 @@ func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Read
 		}
 	}
 
-	if appendData && !isExist {
-		appendData = false
+	if offset > -1 && !isExist {
+		offset = -1
 	}
 
-	if !appendData {
+	if offset == -1 {
 		if isExist {
 			err = os.Remove(rPath)
 			if err != nil {
@@ -178,7 +178,15 @@ func (driver *Driver) PutFile(ctx *server.Context, destPath string, data io.Read
 	}
 	defer of.Close()
 
-	_, err = of.Seek(0, os.SEEK_END)
+	info, err := of.Stat()
+	if err != nil {
+		return 0, err
+	}
+	if offset > info.Size() {
+		return 0, fmt.Errorf("Offset %d is beyond file size %d", offset, info.Size())
+	}
+
+	_, err = of.Seek(offset, os.SEEK_END)
 	if err != nil {
 		return 0, err
 	}
