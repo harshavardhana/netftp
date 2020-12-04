@@ -312,13 +312,14 @@ func (cmd commandEprt) Execute(sess *Session, param string) {
 		sess.writeMessage(522, "Network protocol not supported, use (1,2)")
 		return
 	}
-	host := parts[2]
-	port, err := strconv.Atoi(parts[3])
-	if err != nil {
+	if addressFamily != 1 && addressFamily != 2 {
 		sess.writeMessage(522, "Network protocol not supported, use (1,2)")
 		return
 	}
-	if addressFamily != 1 && addressFamily != 2 {
+
+	host := parts[2]
+	port, err := strconv.Atoi(parts[3])
+	if err != nil {
 		sess.writeMessage(522, "Network protocol not supported, use (1,2)")
 		return
 	}
@@ -435,7 +436,7 @@ func (cmd commandEpsv) Execute(sess *Session, param string) {
 	sess.writeMessage(229, msg)
 }
 
-// commandList responds to the LIST FTP command. It allows the client to retreive
+// commandList responds to the LIST FTP command. It allows the client to retrieve
 // a detailed listing of the contents of a directory.
 type commandList struct{}
 
@@ -556,7 +557,7 @@ func parseListParam(param string) (path string) {
 }
 
 // commandNlst responds to the NLST FTP command. It allows the client to
-// retreive a list of filenames in the current directory.
+// retrieve a list of filenames in the current directory.
 type commandNlst struct{}
 
 func (cmd commandNlst) IsExtend() bool {
