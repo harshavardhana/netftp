@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -236,7 +238,8 @@ func (cmd commandCwd) Execute(sess *Session, param string) {
 	}
 	info, err := sess.server.Driver.Stat(&ctx, path)
 	if err != nil {
-		sess.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed: ", err))
+		sess.logf("%v", err)
+		sess.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed."))
 		return
 	}
 	if !info.IsDir() {
@@ -250,7 +253,8 @@ func (cmd commandCwd) Execute(sess *Session, param string) {
 	if err == nil {
 		sess.writeMessage(250, "Directory changed to "+path)
 	} else {
-		sess.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed: ", err))
+		sess.logf("%v", err)
+		sess.writeMessage(550, fmt.Sprint("Directory change to ", path, " failed."))
 	}
 }
 
@@ -283,7 +287,8 @@ func (cmd commandDele) Execute(sess *Session, param string) {
 	if err == nil {
 		sess.writeMessage(250, "File deleted")
 	} else {
-		sess.writeMessage(550, fmt.Sprint("File delete failed: ", err))
+		sess.logf("%v", err)
+		sess.writeMessage(550, fmt.Sprint("File delete failed. "))
 	}
 }
 
@@ -452,6 +457,30 @@ func (cmd commandList) RequireAuth() bool {
 	return true
 }
 
+func convertFileInfo(sess *Session, f os.FileInfo, p string) (FileInfo, error) {
+	mode, err := sess.server.Perm.GetMode(p)
+	if err != nil {
+		return nil, err
+	}
+	if f.IsDir() {
+		mode |= os.ModeDir
+	}
+	owner, err := sess.server.Perm.GetOwner(p)
+	if err != nil {
+		return nil, err
+	}
+	group, err := sess.server.Perm.GetGroup(p)
+	if err != nil {
+		return nil, err
+	}
+	return &fileInfo{
+		FileInfo: f,
+		mode:     mode,
+		owner:    owner,
+		group:    group,
+	}, nil
+}
+
 func list(sess *Session, cmd, p, param string) ([]FileInfo, error) {
 	info, err := sess.server.Driver.Stat(&Context{
 		Sess:  sess,
@@ -474,54 +503,22 @@ func list(sess *Session, cmd, p, param string) ([]FileInfo, error) {
 			Cmd:   cmd,
 			Param: param,
 		}, p, func(f os.FileInfo) error {
-			mode, err := sess.server.Perm.GetMode(path.Join(p, f.Name()))
+			info, err := convertFileInfo(sess, f, path.Join(p, f.Name()))
 			if err != nil {
 				return err
 			}
-			if f.IsDir() {
-				mode |= os.ModeDir
-			}
-			owner, err := sess.server.Perm.GetOwner(path.Join(p, f.Name()))
-			if err != nil {
-				return err
-			}
-			group, err := sess.server.Perm.GetGroup(path.Join(p, f.Name()))
-			if err != nil {
-				return err
-			}
-			files = append(files, &fileInfo{
-				FileInfo: f,
-				mode:     mode,
-				owner:    owner,
-				group:    group,
-			})
+			files = append(files, info)
 			return nil
 		})
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		mode, err := sess.server.Perm.GetMode(p)
+		newInfo, err := convertFileInfo(sess, info, p)
 		if err != nil {
 			return nil, err
 		}
-		if info.IsDir() {
-			mode |= os.ModeDir
-		}
-		owner, err := sess.server.Perm.GetOwner(p)
-		if err != nil {
-			return nil, err
-		}
-		group, err := sess.server.Perm.GetGroup(p)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, &fileInfo{
-			FileInfo: info,
-			mode:     mode,
-			owner:    owner,
-			group:    group,
-		})
+		files = append(files, newInfo)
 	}
 	return files, nil
 }
@@ -1291,10 +1288,80 @@ func (cmd commandSize) Execute(sess *Session, param string) {
 		Param: param,
 	}, path)
 	if err != nil {
-		sess.logf("Size: error(%s)", err)
-		sess.writeMessage(450, fmt.Sprint("path", path, "not found"))
+		log.Printf("Size: error(%s)", err)
+		sess.writeMessage(450, fmt.Sprintf("path %s not found", param))
 	} else {
 		sess.writeMessage(213, strconv.Itoa(int(stat.Size())))
+	}
+}
+
+// commandStat responds to the STAT FTP command. It returns the stat of the
+// requested path.
+type commandStat struct{}
+
+func (cmd commandStat) IsExtend() bool {
+	return false
+}
+
+func (cmd commandStat) RequireParam() bool {
+	return false
+}
+
+func (cmd commandStat) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandStat) Execute(sess *Session, param string) {
+	// system stat
+	if param == "" {
+		sess.writeMessage(211, fmt.Sprintf("%s FTP server status:\nVersion %s"+
+			"Connected to %s (%s)\n"+
+			"Logged in %s\n"+
+			"TYPE: ASCII, FORM: Nonprint; STRUcture: File; transfer MODE: Stream\n"+
+			"No data connection", sess.PublicIP(), version, sess.PublicIP(),
+			version, sess.LoginUser()))
+		sess.writeMessage(211, "End of status")
+		return
+	}
+
+	var ctx = Context{
+		Sess:  sess,
+		Cmd:   "STAT",
+		Param: param,
+	}
+
+	// file or directory stat
+	path := sess.buildPath(param)
+	stat, err := sess.server.Driver.Stat(&ctx, path)
+	if err != nil {
+		log.Printf("Size: error(%s)", err)
+		sess.writeMessage(450, fmt.Sprintf("path %s not found", path))
+	} else {
+		var files []FileInfo
+		if stat.IsDir() {
+			err = sess.server.Driver.ListDir(&ctx, path, func(f os.FileInfo) error {
+				info, err := convertFileInfo(sess, f, filepath.Join(path, f.Name()))
+				if err != nil {
+					return err
+				}
+				files = append(files, info)
+				return nil
+			})
+			if err != nil {
+				sess.writeMessage(550, err.Error())
+				return
+			}
+			sess.writeMessage(213, "Opening ASCII mode data connection for file list")
+		} else {
+			info, err := convertFileInfo(sess, stat, path)
+			if err != nil {
+				sess.writeMessage(550, err.Error())
+				return
+			}
+			files = append(files, info)
+			sess.writeMessage(212, "Opening ASCII mode data connection for file list")
+		}
+		sess.sendOutofbandData(listFormatter(files).Detailed())
 	}
 }
 

@@ -14,6 +14,10 @@ import (
 	"strconv"
 )
 
+var (
+	version = "2.0beta"
+)
+
 // ServerOpts contains parameters for server.NewServer()
 type ServerOpts struct {
 	// This server supported commands, if blank, it will be defaultCommands
