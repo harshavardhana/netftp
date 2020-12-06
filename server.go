@@ -273,6 +273,7 @@ func (server *Server) ListenAndServe() error {
 func (server *Server) Serve(l net.Listener) error {
 	server.listener = l
 	server.ctx, server.cancel = context.WithCancel(context.Background())
+	defer server.cancel()
 	sessionID := newSessionID()
 	for {
 		tcpConn, err := server.listener.Accept()

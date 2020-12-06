@@ -34,6 +34,7 @@ var (
 		"CWD":  commandCwd{},
 		"CCC":  commandCcc{},
 		"CONF": commandConf{},
+		"CLNT": commandCLNT{},
 		"DELE": commandDele{},
 		"ENC":  commandEnc{},
 		"EPRT": commandEprt{},
@@ -139,7 +140,25 @@ func (cmd commandAppe) Execute(sess *Session, param string) {
 	} else {
 		sess.writeMessage(450, fmt.Sprint("error during transfer: ", err))
 	}
+}
 
+type commandCLNT struct{}
+
+func (cmd commandCLNT) IsExtend() bool {
+	return true
+}
+
+func (cmd commandCLNT) RequireParam() bool {
+	return false
+}
+
+func (cmd commandCLNT) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandCLNT) Execute(sess *Session, param string) {
+	sess.clientSoft = param
+	sess.writeMessage(200, "OK")
 }
 
 type commandOpts struct{}

@@ -42,6 +42,7 @@ type Session struct {
 	preCommand    string
 	closed        bool
 	tls           bool
+	clientSoft    string
 	Data          map[string]interface{} // shared data between different commands
 }
 
