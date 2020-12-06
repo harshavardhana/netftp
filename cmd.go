@@ -1006,7 +1006,17 @@ func (cmd commandRnfr) RequireAuth() bool {
 }
 
 func (cmd commandRnfr) Execute(sess *Session, param string) {
-	sess.renameFrom = sess.buildPath(param)
+	sess.renameFrom = ""
+	p := sess.buildPath(param)
+	if _, err := sess.server.Driver.Stat(&Context{
+		Sess:  sess,
+		Cmd:   "RNFR",
+		Param: param,
+	}, p); err != nil {
+		sess.writeMessage(550, fmt.Sprint("Action not taken: ", err))
+		return
+	}
+	sess.renameFrom = p
 	sess.writeMessage(350, "Requested file action pending further information.")
 }
 

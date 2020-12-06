@@ -206,14 +206,14 @@ func (socket *passiveSocket) ListenAndServe() (err error) {
 	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("", strconv.Itoa(socket.port)))
 	if err != nil {
 		socket.sess.log(err)
-		return
+		return err
 	}
 
 	var tcplistener *net.TCPListener
 	tcplistener, err = net.ListenTCP("tcp", laddr)
 	if err != nil {
 		socket.sess.log(err)
-		return
+		return err
 	}
 
 	// The timeout, for a remote client to establish connection
@@ -222,7 +222,7 @@ func (socket *passiveSocket) ListenAndServe() (err error) {
 	err = tcplistener.SetDeadline(time.Now().Add(acceptTimeout))
 	if err != nil {
 		socket.sess.log(err)
-		return
+		return err
 	}
 
 	var listener net.Listener = tcplistener
@@ -231,7 +231,7 @@ func (socket *passiveSocket) ListenAndServe() (err error) {
 	port, err := strconv.Atoi(parts[len(parts)-1])
 	if err != nil {
 		socket.sess.log(err)
-		return
+		return err
 	}
 
 	socket.port = port
