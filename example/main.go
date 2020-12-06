@@ -21,7 +21,8 @@ func main() {
 			Name:     "admin",
 			Password: "admin",
 		},
-		Perm: server.NewSimplePerm("root", "root"),
+		Perm:      server.NewSimplePerm("root", "root"),
+		RateLimit: 1000000, // 1MB/s limit
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"goftp.io/server/v2/ratelimit"
 )
 
 // DataSocket describes a data socket is used to send non-control data between the client and
@@ -39,6 +41,8 @@ type DataSocket interface {
 
 type activeSocket struct {
 	conn *net.TCPConn
+	reader io.Reader
+	writer io.Writer
 	sess *Session
 	host string
 	port int
@@ -66,6 +70,8 @@ func newActiveSocket(sess *Session, remote string, port int) (DataSocket, error)
 	socket := new(activeSocket)
 	socket.sess = sess
 	socket.conn = tcpConn
+	socket.reader = ratelimit.Reader(tcpConn, sess.server.rateLimiter)
+	socket.writer = ratelimit.Writer(tcpConn, sess.server.rateLimiter)
 	socket.host = remote
 	socket.port = port
 
@@ -81,15 +87,15 @@ func (socket *activeSocket) Port() int {
 }
 
 func (socket *activeSocket) Read(p []byte) (n int, err error) {
-	return socket.conn.Read(p)
+	return socket.reader.Read(p)
 }
 
 func (socket *activeSocket) ReadFrom(r io.Reader) (int64, error) {
-	return socket.conn.ReadFrom(r)
+	return io.Copy(socket.writer, r)
 }
 
 func (socket *activeSocket) Write(p []byte) (n int, err error) {
-	return socket.conn.Write(p)
+	return socket.writer.Write(p)
 }
 
 func (socket *activeSocket) Close() error {
@@ -99,6 +105,8 @@ func (socket *activeSocket) Close() error {
 type passiveSocket struct {
 	sess    *Session
 	conn    net.Conn
+	reader io.Reader
+	writer io.Writer
 	port    int
 	host    string
 	ingress chan []byte
@@ -169,7 +177,7 @@ func (socket *passiveSocket) Read(p []byte) (n int, err error) {
 	if socket.err != nil {
 		return 0, socket.err
 	}
-	return socket.conn.Read(p)
+	return socket.reader.Read(p)
 }
 
 func (socket *passiveSocket) ReadFrom(r io.Reader) (int64, error) {
@@ -181,7 +189,7 @@ func (socket *passiveSocket) ReadFrom(r io.Reader) (int64, error) {
 
 	// For normal TCPConn, this will use sendfile syscall; if not,
 	// it will just downgrade to normal read/write procedure
-	return io.Copy(socket.conn, r)
+	return io.Copy(socket.writer, r)
 }
 
 func (socket *passiveSocket) Write(p []byte) (n int, err error) {
@@ -190,7 +198,7 @@ func (socket *passiveSocket) Write(p []byte) (n int, err error) {
 	if socket.err != nil {
 		return 0, socket.err
 	}
-	return socket.conn.Write(p)
+	return socket.writer.Write(p)
 }
 
 func (socket *passiveSocket) Close() error {
@@ -250,6 +258,8 @@ func (socket *passiveSocket) ListenAndServe() (err error) {
 		}
 		socket.err = nil
 		socket.conn = conn
+		socket.reader = ratelimit.Reader(socket.conn, socket.sess.server.rateLimiter)
+		socket.writer = ratelimit.Writer(socket.conn, socket.sess.server.rateLimiter)
 		_ = listener.Close()
 	}()
 	return nil

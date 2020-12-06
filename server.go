@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"goftp.io/server/v2/ratelimit"
 )
 
 var (
@@ -69,6 +71,9 @@ type Options struct {
 
 	// A logger implementation, if nil the StdLogger is used
 	Logger Logger
+
+	// Rate Limit per connection bytes per second, 0 means no limit
+	RateLimit int64
 }
 
 // Server is the root of your FTP application. You should instantiate one
@@ -85,6 +90,8 @@ type Server struct {
 	cancel    context.CancelFunc
 	feats     string
 	notifiers notifierList
+	// rate limiter per connection
+	rateLimiter *ratelimit.Limiter
 }
 
 // ErrServerClosed is returned by ListenAndServe() or Serve() when a shutdown
@@ -143,6 +150,7 @@ func optsWithDefaults(opts *Options) *Options {
 
 	newOpts.PublicIP = opts.PublicIP
 	newOpts.PassivePorts = opts.PassivePorts
+	newOpts.RateLimit = opts.RateLimit
 
 	return &newOpts
 }
@@ -186,6 +194,7 @@ func NewServer(opts *Options) (*Server, error) {
 		featCmds += " AUTH TLS\n PBSZ\n PROT\n"
 	}
 	s.feats = fmt.Sprintf(feats, featCmds)
+	s.rateLimiter = ratelimit.New(opts.RateLimit)
 
 	return s, nil
 }
