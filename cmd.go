@@ -1042,15 +1042,24 @@ func (cmd commandRmd) RequireAuth() bool {
 }
 
 func (cmd commandRmd) Execute(sess *Session, param string) {
-	path := sess.buildPath(param)
+	p := sess.buildPath(param)
 	var ctx = Context{
 		Sess:  sess,
 		Cmd:   "RMD",
 		Param: param,
 	}
-	sess.server.notifiers.BeforeDeleteDir(&ctx, path)
-	err := sess.server.Driver.DeleteDir(&ctx, path)
-	sess.server.notifiers.AfterDirDeleted(&ctx, path, err)
+	if param == "/" || param == "" {
+		sess.writeMessage(550, "Directory / cannot be deleted")
+	}
+
+	var needChangeCurDir = strings.HasPrefix(param, sess.curDir)
+
+	sess.server.notifiers.BeforeDeleteDir(&ctx, p)
+	err := sess.server.Driver.DeleteDir(&ctx, p)
+	if needChangeCurDir {
+		sess.curDir = path.Dir(param)
+	}
+	sess.server.notifiers.AfterDirDeleted(&ctx, p, err)
 	if err == nil {
 		sess.writeMessage(250, "Directory deleted")
 	} else {

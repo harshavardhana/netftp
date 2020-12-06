@@ -117,6 +117,13 @@ func TestFileDriver(t *testing.T) {
 			err = f.RemoveDir("/src")
 			assert.NoError(t, err)
 
+			curDir, err = f.CurrentDir()
+			assert.NoError(t, err)
+			assert.EqualValues(t, "/", curDir)
+
+			assert.NoError(t, f.Stor(" file_name .test", strings.NewReader("tttt")))
+			assert.NoError(t, f.Delete(" file_name .test"))
+
 			err = f.Quit()
 			assert.NoError(t, err)
 

@@ -226,7 +226,7 @@ func (sess *Session) parseLine(line string) (string, string) {
 	if len(params) == 1 {
 		return params[0], ""
 	}
-	return params[0], strings.TrimSpace(params[1])
+	return params[0], params[1]
 }
 
 // writeMessage will send a standard FTP response back to the client.
