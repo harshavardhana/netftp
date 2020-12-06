@@ -65,9 +65,9 @@ func (sess *Session) PublicIP() string {
 	return sess.server.PublicIP
 }
 
-// ServerOpts returns the server options
-func (sess *Session) ServerOpts() *ServerOpts {
-	return sess.server.ServerOpts
+// Options returns the server options
+func (sess *Session) Options() *Options {
+	return sess.server.Options
 }
 
 func (sess *Session) passiveListenIP() string {
@@ -211,7 +211,7 @@ func (sess *Session) receiveLine(line string) {
 	}
 	if cmdObj.RequireParam() && param == "" {
 		sess.writeMessage(553, "action aborted, required param missing")
-	} else if sess.server.ServerOpts.ForceTLS && !sess.tls && !(cmdObj == commands["AUTH"] && param == "TLS") {
+	} else if sess.server.Options.ForceTLS && !sess.tls && !(cmdObj == commands["AUTH"] && param == "TLS") {
 		sess.writeMessage(534, "Request denied for policy reasons. AUTH TLS required.")
 	} else if cmdObj.RequireAuth() && sess.user == "" {
 		sess.writeMessage(530, "not logged in")

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func runServer(t *testing.T, opt *server.ServerOpts, notifiers []server.Notifier, execute func()) {
+func runServer(t *testing.T, opt *server.Options, notifiers []server.Notifier, execute func()) {
 	s, err := server.NewServer(opt)
 	assert.NoError(t, err)
 	for _, notifier := range notifiers {

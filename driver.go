@@ -24,7 +24,7 @@ type FileInfo interface {
 // driver for each client that connects and delegate to it as required.
 //
 // Note that if the driver also implements the Auth interface then
-// this will be called instead of calling ServerOpts.Auth. This allows
+// this will be called instead of calling Options.Auth. This allows
 // the Auth mechanism to change the driver configuration.
 type Driver interface {
 	// params  - a file path

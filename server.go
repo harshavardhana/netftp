@@ -18,8 +18,8 @@ var (
 	version = "2.0beta"
 )
 
-// ServerOpts contains parameters for server.NewServer()
-type ServerOpts struct {
+// Options contains parameters for server.NewServer()
+type Options struct {
 	// This server supported commands, if blank, it will be defaultCommands
 	// So that users could override the Commands
 	Commands map[string]Command
@@ -76,7 +76,7 @@ type ServerOpts struct {
 //
 // Always use the NewServer() method to create a new Server.
 type Server struct {
-	*ServerOpts
+	*Options
 	listenTo  string
 	logger    Logger
 	listener  net.Listener
@@ -91,12 +91,12 @@ type Server struct {
 // was requested.
 var ErrServerClosed = errors.New("ftp: Server closed")
 
-// serverOptsWithDefaults copies an ServerOpts struct into a new struct,
+// optsWithDefaults copies an Options struct into a new struct,
 // then adds any default values that are missing and returns the new data.
-func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
-	var newOpts ServerOpts
+func optsWithDefaults(opts *Options) *Options {
+	var newOpts Options
 	if opts == nil {
-		opts = &ServerOpts{}
+		opts = &Options{}
 	}
 	if opts.Hostname == "" {
 		newOpts.Hostname = "::"
@@ -104,7 +104,7 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 		newOpts.Hostname = opts.Hostname
 	}
 	if opts.Port == 0 {
-		newOpts.Port = 3000
+		newOpts.Port = 2121
 	} else {
 		newOpts.Port = opts.Port
 	}
@@ -148,11 +148,11 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 }
 
 // NewServer initialises a new FTP server. Configuration options are provided
-// via an instance of ServerOpts. Calling this function in your code will
+// via an instance of Options. Calling this function in your code will
 // probably look something like this:
 //
 //     driver := &MyDriver{}
-//     opts    := &server.ServerOpts{
+//     opts    := &server.Options{
 //       Driver: driver,
 //       Auth: auth,
 //       Port: 2000,
@@ -161,13 +161,13 @@ func serverOptsWithDefaults(opts *ServerOpts) *ServerOpts {
 //     }
 //     server, err  := server.NewServer(opts)
 //
-func NewServer(opts *ServerOpts) (*Server, error) {
-	opts = serverOptsWithDefaults(opts)
+func NewServer(opts *Options) (*Server, error) {
+	opts = optsWithDefaults(opts)
 	if opts.Perm == nil {
 		return nil, errors.New("No perm implementation")
 	}
 	s := new(Server)
-	s.ServerOpts = opts
+	s.Options = opts
 	s.listenTo = net.JoinHostPort(opts.Hostname, strconv.Itoa(opts.Port))
 	s.logger = opts.Logger
 
@@ -244,13 +244,13 @@ func (server *Server) ListenAndServe() error {
 	var listener net.Listener
 	var err error
 
-	if server.ServerOpts.TLS {
+	if server.Options.TLS {
 		server.tlsConfig, err = simpleTLSConfig(server.CertFile, server.KeyFile)
 		if err != nil {
 			return err
 		}
 
-		if server.ServerOpts.ExplicitFTPS {
+		if server.Options.ExplicitFTPS {
 			listener, err = net.Listen("tcp", server.listenTo)
 		} else {
 			listener, err = tls.Listen("tcp", server.listenTo, server.tlsConfig)

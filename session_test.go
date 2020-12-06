@@ -70,7 +70,7 @@ func (m mockConn) SetWriteDeadline(t time.Time) error {
 func TestPassiveListenIP(t *testing.T) {
 	c := &Session{
 		server: &Server{
-			ServerOpts: &ServerOpts{
+			Options: &Options{
 				PublicIP: "1.1.1.1",
 			},
 		},
@@ -84,7 +84,7 @@ func TestPassiveListenIP(t *testing.T) {
 			ip: net.IPv4(1, 1, 1, 1),
 		},
 		server: &Server{
-			ServerOpts: &ServerOpts{},
+			Options: &Options{},
 		},
 	}
 	if c.passiveListenIP() != "1.1.1.1" {

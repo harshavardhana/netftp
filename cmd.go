@@ -72,7 +72,7 @@ var (
 		"XCWD": commandCwd{},
 		"XMKD": commandMkd{},
 		"XPWD": commandPwd{},
-		"XRMD": commandRmd{},
+		"XRMD": commandXRmd{},
 	}
 )
 
@@ -1042,14 +1042,39 @@ func (cmd commandRmd) RequireAuth() bool {
 }
 
 func (cmd commandRmd) Execute(sess *Session, param string) {
+	executeRmd("RMD", sess, param)
+}
+
+// cmdXRmd responds to the RMD FTP command. It allows the client to delete a
+// directory.
+type commandXRmd struct{}
+
+func (cmd commandXRmd) IsExtend() bool {
+	return false
+}
+
+func (cmd commandXRmd) RequireParam() bool {
+	return true
+}
+
+func (cmd commandXRmd) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandXRmd) Execute(sess *Session, param string) {
+	executeRmd("XRMD", sess, param)
+}
+
+func executeRmd(cmd string, sess *Session, param string) {
 	p := sess.buildPath(param)
 	var ctx = Context{
 		Sess:  sess,
-		Cmd:   "RMD",
+		Cmd:   cmd,
 		Param: param,
 	}
 	if param == "/" || param == "" {
 		sess.writeMessage(550, "Directory / cannot be deleted")
+		return
 	}
 
 	var needChangeCurDir = strings.HasPrefix(param, sess.curDir)
@@ -1172,7 +1197,7 @@ func (cmd commandMLSD) IsExtend() bool {
 }
 
 func (cmd commandMLSD) RequireParam() bool {
-	return true
+	return false
 }
 
 func (cmd commandMLSD) RequireAuth() bool {
@@ -1186,8 +1211,14 @@ func toMLSDFormat(files []FileInfo) []byte {
 		if file.IsDir() {
 			fileType = "dir"
 		}
+		/*Possible facts "Size" / "Modify" / "Create" /
+				  "Type" / "Unique" / "Perm" /
+				  "Lang" / "Media-Type" / "CharSet"
+				  TODO: Perm pvals        = "a" / "c" / "d" / "e" / "f" /
+		                     "l" / "m" / "p" / "r" / "w"
+		*/
 		fmt.Fprintf(&buf,
-			"type=%s;modify=%s;size=%d; %s\n",
+			"Type=%s;Modify=%s;Size=%d; %s\n",
 			fileType,
 			file.ModTime().Format("20060102150405"),
 			file.Size(),
@@ -1198,9 +1229,12 @@ func toMLSDFormat(files []FileInfo) []byte {
 }
 
 func (cmd commandMLSD) Execute(sess *Session, param string) {
+	if param == "" {
+		param = sess.curDir
+	}
 	p := sess.buildPath(param)
 
-	files, err := list(sess, "LIST", p, param)
+	files, err := list(sess, "MLSD", p, param)
 	if err != nil {
 		sess.writeMessage(550, err.Error())
 		return

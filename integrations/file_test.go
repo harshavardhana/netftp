@@ -27,7 +27,7 @@ func TestFileDriver(t *testing.T) {
 	driver, err := file.NewDriver("./testdata")
 	assert.NoError(t, err)
 
-	opt := &server.ServerOpts{
+	opt := &server.Options{
 		Name:   "test ftpd",
 		Driver: driver,
 		Perm:   perm,
@@ -141,7 +141,7 @@ func TestLogin(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Server options without hostname or port
-	opt := &server.ServerOpts{
+	opt := &server.Options{
 		Name:   "test ftpd",
 		Driver: driver,
 		Auth: &server.SimpleAuth{

@@ -33,7 +33,7 @@ func TestDriver(t *testing.T) {
 
 	minioDriver, err := minio.NewDriver(endpoint, accessKeyID, secretKey, location, bucket, useSSL)
 	assert.NoError(t, err)
-	opt := &server.ServerOpts{
+	opt := &server.Options{
 		Name:   "test ftpd",
 		Driver: minioDriver,
 		Port:   2120,
@@ -65,7 +65,7 @@ func TestDriver(t *testing.T) {
 			assert.EqualValues(t, "/", curDir)
 
 			err = f.RemoveDir("/")
-			assert.NoError(t, err)
+			assert.Error(t, err)
 
 			var content = `test`
 			assert.NoError(t, f.Stor("server_test.go", strings.NewReader(content)))
@@ -99,11 +99,13 @@ func TestDriver(t *testing.T) {
 			assert.NoError(t, f.Stor("server_test2.go", strings.NewReader(content)))
 
 			err = f.RemoveDir("/")
-			assert.NoError(t, err)
+			assert.Error(t, err)
 
 			entries, err = f.List("/")
 			assert.NoError(t, err)
-			assert.EqualValues(t, 0, len(entries))
+			assert.EqualValues(t, 1, len(entries))
+
+			assert.NoError(t, f.Delete("/server_test2.go"))
 
 			assert.NoError(t, f.Stor("server_test3.go", strings.NewReader(content)))
 

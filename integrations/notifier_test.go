@@ -116,7 +116,7 @@ func TestNotification(t *testing.T) {
 	driver, err := file.NewDriver("./testdata")
 	assert.NoError(t, err)
 
-	opt := &server.ServerOpts{
+	opt := &server.Options{
 		Name:   "test ftpd",
 		Driver: driver,
 		Port:   2121,
