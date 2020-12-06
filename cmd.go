@@ -62,6 +62,7 @@ var (
 		"RNTO": commandRnto{},
 		"RMD":  commandRmd{},
 		"SIZE": commandSize{},
+		"STAT": commandStat{},
 		"STOR": commandStor{},
 		"STRU": commandStru{},
 		"SYST": commandSyst{},
