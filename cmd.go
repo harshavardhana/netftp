@@ -288,7 +288,7 @@ func (cmd commandDele) Execute(sess *Session, param string) {
 		sess.writeMessage(250, "File deleted")
 	} else {
 		sess.logf("%v", err)
-		sess.writeMessage(550, fmt.Sprint("File delete failed. "))
+		sess.writeMessage(550, "File delete failed. ")
 	}
 }
 
@@ -1177,7 +1177,7 @@ func toMLSDFormat(files []FileInfo) []byte {
 			fileType = "dir"
 		}
 		fmt.Fprintf(&buf,
-			"type=%s;modify=%s;size=%s; %s\n",
+			"type=%s;modify=%s;size=%d; %s\n",
 			fileType,
 			file.ModTime().Format("20060102150405"),
 			file.Size(),
