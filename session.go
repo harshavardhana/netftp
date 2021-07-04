@@ -6,7 +6,6 @@ package server
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
@@ -180,21 +179,10 @@ func (sess *Session) upgradeToTLS() error {
 // appropriate response.
 func (sess *Session) receiveLine(line string) {
 	defer func() {
-		if e := recover(); e != nil {
-			var buf bytes.Buffer
-			fmt.Fprintf(&buf, "Handler crashed with error: %v", e)
-
-			for i := 1; ; i++ {
-				_, file, line, ok := runtime.Caller(i)
-				if !ok {
-					break
-				} else {
-					fmt.Fprintf(&buf, "\n")
-				}
-				fmt.Fprintf(&buf, "%v:%v", file, line)
-			}
-
-			sess.log(buf.String())
+		if err := recover(); err != nil {
+			buf := make([]byte, 1<<16)
+			buf = buf[:runtime.Stack(buf, false)]
+			sess.logf("handler crashed with error:%v\n%s", err, buf)
 		}
 	}()
 
