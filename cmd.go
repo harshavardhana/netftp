@@ -77,6 +77,11 @@ var (
 	}
 )
 
+// DefaultCommands returns the default commands
+func DefaultCommands() map[string]Command {
+	return defaultCommands
+}
+
 // commandAllo responds to the ALLO FTP command.
 //
 // This is essentially a ping from the client so we just respond with an
